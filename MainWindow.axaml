@@ -5,7 +5,7 @@
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         xmlns:vm="using:KeySounds.ViewModels"
         x:DataType="vm:MainWindowViewModel"
-        x:Class="KeySounds.MainWindow" Width="560" Height="480"
+        x:Class="KeySounds.MainWindow" Width="560" Height="530"
         CanResize="False" Title="KeySounds">
     <Border Padding="28">
       <StackPanel Spacing="18">
@@ -27,6 +27,8 @@
         </Border>
         <TextBlock Foreground="Crimson" TextWrapping="Wrap" Text="{Binding ErrorMessage}"/>
         <TextBlock Foreground="DarkGoldenrod" TextWrapping="Wrap" Text="{Binding SettingsStatus}"/>
+        <TextBlock Text="{Binding SoundPackStatus}"/>
+        <TextBlock Text="{Binding SampleCacheStatus}"/>
       </StackPanel>
     </Border>
 </Window>

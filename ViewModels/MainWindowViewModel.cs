@@ -28,11 +28,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         set { Persist(() => _settings?.SetGlobalVolumeAsync((float)value)); Raise(); }
     }
     public string? SettingsStatus => _settings?.StatusMessage;
-    public async Task StartAsync()
+    public string SoundPackStatus => _settings is null ? "Built-in pack" : $"{_settings.ValidPackCount} valid, {_settings.InvalidPackCount} invalid packs";
+    public string SampleCacheStatus
     {
-        if (_settings is not null) { await _settings.InitializeAsync(); _coordinator.IsEnabled = _settings.Settings.SoundsEnabled; }
-        await _coordinator.StartAsync();
-        Raise(nameof(Profiles)); Raise(nameof(SelectedProfile)); Raise(nameof(GlobalVolume)); Raise(nameof(IsEnabled)); Raise(nameof(SettingsStatus));
+        get { var snapshot = _settings?.CacheSnapshot; return snapshot is null ? "1 sample" : $"{snapshot.LoadedSampleCount} samples, {snapshot.DecodedBytes / 1024d:F1} KiB decoded"; }
+    }
+    public async Task StartAsync(CancellationToken token = default)
+    {
+        if (_settings is not null) { await _settings.InitializeAsync(token); _coordinator.IsEnabled = _settings.Settings.SoundsEnabled; }
+        await _coordinator.StartAsync(token);
+        Raise(nameof(Profiles)); Raise(nameof(SelectedProfile)); Raise(nameof(GlobalVolume)); Raise(nameof(IsEnabled)); Raise(nameof(SettingsStatus)); Raise(nameof(SoundPackStatus)); Raise(nameof(SampleCacheStatus));
     }
     public Task StopAsync() => _coordinator.StopAsync();
     public void ReportShutdownError(Exception exception) { _shutdownError = exception.Message; Raise(nameof(ErrorMessage)); }

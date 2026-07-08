@@ -3,21 +3,33 @@ using KeySounds.Application.Routing;
 using KeySounds.Core.Profiles;
 using KeySounds.Core.Settings;
 using KeySounds.Infrastructure.Persistence;
+using KeySounds.Application.SoundPacks;
+using KeySounds.Audio;
+using KeySounds.Core.SoundPacks;
 
 namespace KeySounds.Application.Settings;
 
-public sealed class Phase2SettingsService(JsonApplicationSettingsRepository settingsRepository, JsonProfileRepository profileRepository, ActiveProfileService activeProfiles, KeyboardSoundRouter router)
+public sealed class Phase2SettingsService(JsonApplicationSettingsRepository settingsRepository, JsonProfileRepository profileRepository, ActiveProfileService activeProfiles, KeyboardSoundRouter router,
+    ISoundSampleCache? sampleCache = null, SoundPackCatalogService? catalog = null) : IAsyncDisposable
 {
+    private readonly SemaphoreSlim _activationGate = new(1, 1);
+    private bool _shutdown;
     public ApplicationSettings Settings { get; private set; } = new();
     public IReadOnlyList<SoundProfile> Profiles { get; private set; } = [];
     public string? StatusMessage { get; private set; }
+    public int ValidPackCount => catalog?.Packs.Count(pack => pack.Validation.IsValid) ?? 1;
+    public int InvalidPackCount => catalog?.Packs.Count(pack => !pack.Validation.IsValid) ?? 0;
+    public SampleCacheSnapshot CacheSnapshot => sampleCache?.GetSnapshot() ?? new(1, 0, 1, false, 0);
 
     public async Task InitializeAsync(CancellationToken token = default)
     {
         var loaded = await settingsRepository.LoadAsync(token);
+        if (catalog is not null) await catalog.InitializeAsync(token);
         Settings = loaded.Settings;
         StatusMessage = loaded.RecoveryMessage;
         var profiles = (await profileRepository.ListAsync(token)).ToList();
+        var migration = new FallbackProfileMigrationService(profileRepository);
+        foreach (var profile in profiles) await migration.MigrateAsync(profile, token);
         if (profiles.All(profile => profile.Id != "default"))
         {
             var fallback = Phase2Defaults.CreateProfile();
@@ -26,6 +38,16 @@ public sealed class Phase2SettingsService(JsonApplicationSettingsRepository sett
         }
         Profiles = profiles;
         var selected = profiles.FirstOrDefault(profile => profile.Id == Settings.ActiveProfileId) ?? profiles[0];
+        if (sampleCache is not null)
+        {
+            var preparation = await sampleCache.PrepareAsync(GetRequiredSets(ProfileCompiler.Compile(selected)), token);
+            if (!preparation.Success && selected.Id != "default")
+            {
+                selected = profiles.First(profile => profile.Id == "default");
+                preparation = await sampleCache.PrepareAsync(GetRequiredSets(ProfileCompiler.Compile(selected)), token);
+            }
+            if (!preparation.Success) throw new InvalidOperationException(preparation.Message ?? "Required profile samples could not be prepared.");
+        }
         Settings.ActiveProfileId = selected.Id;
         activeProfiles.Activate(ProfileCompiler.Compile(selected));
         router.GlobalVolume = Math.Clamp(Settings.GlobalVolume, 0, 1);
@@ -35,9 +57,43 @@ public sealed class Phase2SettingsService(JsonApplicationSettingsRepository sett
     public async Task SetGlobalVolumeAsync(float volume, CancellationToken token = default) { Settings.GlobalVolume = Math.Clamp(volume, 0, 1); router.GlobalVolume = Settings.GlobalVolume; await settingsRepository.SaveAsync(Settings, token); }
     public async Task ActivateAsync(string profileId, CancellationToken token = default)
     {
-        var profile = Profiles.FirstOrDefault(item => item.Id == profileId) ?? throw new ArgumentException("Unknown profile.", nameof(profileId));
-        activeProfiles.Activate(ProfileCompiler.Compile(profile));
-        Settings.ActiveProfileId = profile.Id;
-        await settingsRepository.SaveAsync(Settings, token);
+        await _activationGate.WaitAsync(token);
+        try
+        {
+            if (_shutdown) throw new ObjectDisposedException(nameof(Phase2SettingsService));
+            var profile = Profiles.FirstOrDefault(item => item.Id == profileId) ?? throw new ArgumentException("Unknown profile.", nameof(profileId));
+            var compiled = ProfileCompiler.Compile(profile);
+            var required = GetRequiredSets(compiled);
+            if (sampleCache is not null)
+            {
+                var preparation = await sampleCache.PrepareAsync(required, token);
+                if (!preparation.Success) throw new InvalidOperationException(preparation.Message ?? "Sample preparation failed.");
+            }
+            var previousProfile = activeProfiles.Current;
+            var previousId = Settings.ActiveProfileId;
+            activeProfiles.Activate(compiled);
+            Settings.ActiveProfileId = profile.Id;
+            try { await settingsRepository.SaveAsync(Settings, token); }
+            catch { activeProfiles.Activate(previousProfile); Settings.ActiveProfileId = previousId; throw; }
+            if (sampleCache is not null) await sampleCache.ReleaseUnusedAsync(required, token);
+        }
+        finally { _activationGate.Release(); }
     }
+
+    public Task RefreshPacksAsync(CancellationToken token = default) => catalog?.RefreshAsync(token) ?? Task.CompletedTask;
+    private static IReadOnlyCollection<SoundSetReference> GetRequiredSets(CompiledSoundProfile profile)
+    {
+        var required = profile.Groups.Values.Where(item => item.Enabled)
+            .SelectMany(item => new[] { item.DownSetId, item.UpSetId }.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => new SoundSetReference(item.PackId, id!))).ToList();
+        var resolver = new KeyGroupResolver();
+        foreach (var pair in profile.Overrides.Where(item => item.Value.Enabled))
+        {
+            profile.Groups.TryGetValue(resolver.Resolve(pair.Key), out var group);
+            var pack = pair.Value.PackId ?? group?.PackId;
+            if (pack is null) continue;
+            foreach (var set in new[] { pair.Value.DownSetId, pair.Value.UpSetId }.Where(id => !string.IsNullOrWhiteSpace(id))) required.Add(new(pack, set!));
+        }
+        return required.Distinct().ToArray();
+    }
+    public async ValueTask DisposeAsync() { _shutdown = true; await _activationGate.WaitAsync(); _activationGate.Release(); _activationGate.Dispose(); }
 }
