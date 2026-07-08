@@ -1,0 +1,25 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        xmlns:vm="using:KeySounds.ViewModels"
+        x:DataType="vm:MainWindowViewModel"
+        x:Class="KeySounds.MainWindow" Width="520" Height="360"
+        CanResize="False" Title="KeySounds — Technical Proof of Concept">
+    <Border Padding="28">
+      <StackPanel Spacing="18">
+        <TextBlock FontSize="28" FontWeight="SemiBold" Text="KeySounds" />
+        <ToggleSwitch IsChecked="{Binding IsEnabled}" OnContent="Keyboard sounds enabled" OffContent="Keyboard sounds disabled" />
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="18" RowSpacing="10">
+          <TextBlock Grid.Row="0" Text="Input" FontWeight="SemiBold"/><TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding InputStatus}"/>
+          <TextBlock Grid.Row="1" Text="Audio" FontWeight="SemiBold"/><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding AudioStatus}"/>
+          <TextBlock Grid.Row="2" Text="Click triggers" FontWeight="SemiBold"/><TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ClickCount}"/>
+        </Grid>
+        <Border Background="#16000000" CornerRadius="6" Padding="14">
+          <TextBlock TextWrapping="Wrap" Text="Privacy: key events are processed transiently. Typed text is not stored, displayed, or transmitted."/>
+        </Border>
+        <TextBlock Foreground="Crimson" TextWrapping="Wrap" Text="{Binding ErrorMessage}"/>
+      </StackPanel>
+    </Border>
+</Window>
