@@ -4,7 +4,7 @@ using KeySounds.Core.Profiles;
 namespace KeySounds.Application.Profiles;
 
 public sealed record CompiledGroupMapping(bool Enabled, string PackId, string DownSetId, string? UpSetId, float Gain, float PitchVariation, float VolumeVariation, VariationSelectionMode VariationMode);
-public sealed record CompiledKeyMapping(bool Enabled, string? PackId, string? DownSetId, string? UpSetId, float? Gain, float? PitchVariation);
+public sealed record CompiledKeyMapping(bool Enabled, string? PackId, string? DownSetId, string? UpSetId, float? Gain, float? PitchVariation, float? VolumeVariation, VariationSelectionMode? VariationMode);
 
 public sealed class CompiledSoundProfile
 {
@@ -27,7 +27,8 @@ public static class ProfileCompiler
         var groups = profile.Groups.ToDictionary(x => x.Key, x => new CompiledGroupMapping(x.Value.Enabled, x.Value.SoundPackId, x.Value.KeyDownSoundSetId, x.Value.KeyUpSoundSetId,
             Math.Clamp(x.Value.Volume, 0, 1), Math.Clamp(x.Value.PitchVariationSemitones, 0, 3), Math.Clamp(x.Value.VolumeVariation, 0, .2f), x.Value.VariationMode));
         var overrides = profile.KeyOverrides.ToDictionary(x => x.Key, x => new CompiledKeyMapping(x.Value.Enabled, x.Value.SoundPackId, x.Value.KeyDownSoundSetId, x.Value.KeyUpSoundSetId,
-            x.Value.Volume is null ? null : Math.Clamp(x.Value.Volume.Value, 0, 1), x.Value.PitchVariationSemitones is null ? null : Math.Clamp(x.Value.PitchVariationSemitones.Value, 0, 3)));
+            x.Value.Volume is null ? null : Math.Clamp(x.Value.Volume.Value, 0, 1), x.Value.PitchVariationSemitones is null ? null : Math.Clamp(x.Value.PitchVariationSemitones.Value, 0, 3),
+            x.Value.VolumeVariation is null ? null : Math.Clamp(x.Value.VolumeVariation.Value, 0, .2f), x.Value.VariationMode));
         return new CompiledSoundProfile { Id = profile.Id, Enabled = profile.Enabled, MasterGain = Math.Clamp(profile.MasterVolume, 0, 1), PlayOnKeyDown = profile.PlayOnKeyDown,
             PlayOnKeyUp = profile.PlayOnKeyUp, RepeatMode = profile.RepeatMode, RepeatMinimumIntervalMilliseconds = Math.Clamp(profile.RepeatMinimumIntervalMilliseconds, 20, 2000), Groups = groups, Overrides = overrides };
     }

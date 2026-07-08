@@ -7,8 +7,10 @@ public enum VariationSelectionMode { Random, RoundRobin, AvoidImmediateRepeat }
 
 public sealed class SoundProfile
 {
+    public int SchemaVersion { get; init; } = 1;
     public required string Id { get; init; }
     public required string Name { get; set; }
+    public string? Description { get; set; }
     public bool Enabled { get; set; } = true;
     public float MasterVolume { get; set; } = 0.75f;
     public bool PlayOnKeyDown { get; set; } = true;
@@ -39,4 +41,6 @@ public sealed class KeyOverride
     public string? KeyUpSoundSetId { get; set; }
     public float? Volume { get; set; }
     public float? PitchVariationSemitones { get; set; }
+    public float? VolumeVariation { get; set; }
+    public VariationSelectionMode? VariationMode { get; set; }
 }

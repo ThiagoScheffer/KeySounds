@@ -10,7 +10,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 {
     private readonly KeyboardSoundCoordinator _coordinator;
     private readonly Phase2SettingsService? _settings;
-    public MainWindowViewModel(KeyboardSoundCoordinator coordinator, Phase2SettingsService? settings = null) { _coordinator = coordinator; _settings = settings; coordinator.StatusChanged += OnChanged; }
+    private readonly DispatcherTimer _counterTimer;
+    public MainWindowViewModel(KeyboardSoundCoordinator coordinator, Phase2SettingsService? settings = null, ProfilesPageViewModel? profilesPage = null)
+    {
+        _coordinator = coordinator; _settings = settings; ProfilesPage = profilesPage; coordinator.StatusChanged += OnChanged;
+        _counterTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (_, _) => Raise(nameof(ClickCount)));
+    }
+    public ProfilesPageViewModel? ProfilesPage { get; }
     public bool IsEnabled { get => _coordinator.IsEnabled; set { _coordinator.IsEnabled = value; Raise(); Persist(() => _settings?.SetEnabledAsync(value)); } }
     public string InputStatus => _coordinator.InputStatus;
     public string AudioStatus => _coordinator.AudioStatus;
@@ -20,7 +26,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public string? SelectedProfile
     {
         get => _settings?.Profiles.FirstOrDefault(profile => profile.Id == _settings.Settings.ActiveProfileId)?.Name;
-        set { var profile = _settings?.Profiles.FirstOrDefault(item => item.Name == value); if (profile is not null) Persist(() => _settings!.ActivateAsync(profile.Id)); Raise(); }
+        set
+        {
+            var profile = _settings?.Profiles.FirstOrDefault(item => item.Name == value);
+            if (profile is null) return;
+            if (ProfilesPage?.IsDirty == true) { _shutdownError = "Save or revert profile edits before switching the active profile."; Raise(nameof(ErrorMessage)); return; }
+            Persist(async () => { await _settings!.ActivateAsync(profile.Id); ProfilesPage?.RefreshFromServices(); Raise(nameof(SelectedProfile)); return; });
+        }
     }
     public double GlobalVolume
     {
@@ -36,10 +48,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public async Task StartAsync(CancellationToken token = default)
     {
         if (_settings is not null) { await _settings.InitializeAsync(token); _coordinator.IsEnabled = _settings.Settings.SoundsEnabled; }
+        if (ProfilesPage is not null) await ProfilesPage.InitializeAsync();
         await _coordinator.StartAsync(token);
+        _counterTimer.Start();
         Raise(nameof(Profiles)); Raise(nameof(SelectedProfile)); Raise(nameof(GlobalVolume)); Raise(nameof(IsEnabled)); Raise(nameof(SettingsStatus)); Raise(nameof(SoundPackStatus)); Raise(nameof(SampleCacheStatus));
+        Raise(nameof(ProfilesPage));
     }
-    public Task StopAsync() => _coordinator.StopAsync();
+    public Task StopAsync() { _counterTimer.Stop(); return _coordinator.StopAsync(); }
     public void ReportShutdownError(Exception exception) { _shutdownError = exception.Message; Raise(nameof(ErrorMessage)); }
     private void OnChanged(object? s, EventArgs e) => Dispatcher.UIThread.Post(() => { Raise(nameof(InputStatus)); Raise(nameof(AudioStatus)); Raise(nameof(ClickCount)); Raise(nameof(ErrorMessage)); });
     public event PropertyChangedEventHandler? PropertyChanged;

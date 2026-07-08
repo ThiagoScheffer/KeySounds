@@ -1,34 +1,69 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         xmlns:vm="using:KeySounds.ViewModels"
         x:DataType="vm:MainWindowViewModel"
-        x:Class="KeySounds.MainWindow" Width="560" Height="530"
-        CanResize="False" Title="KeySounds">
-    <Border Padding="28">
-      <StackPanel Spacing="18">
-        <TextBlock FontSize="28" FontWeight="SemiBold" Text="KeySounds" />
-        <ToggleSwitch IsChecked="{Binding IsEnabled}" OnContent="Keyboard sounds enabled" OffContent="Keyboard sounds disabled" />
-        <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto" ColumnSpacing="14" RowSpacing="12">
-          <TextBlock Grid.Row="0" VerticalAlignment="Center" Text="Active profile"/>
-          <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}"/>
-          <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="Global volume"/>
-          <Slider Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding GlobalVolume}" TickFrequency="0.05"/>
+        x:Class="KeySounds.MainWindow" Width="1100" Height="760" MinWidth="900" MinHeight="650" Title="KeySounds">
+  <TabControl Margin="20">
+    <TabItem Header="Dashboard">
+      <ScrollViewer><StackPanel Margin="18" Spacing="18" MaxWidth="760" HorizontalAlignment="Left">
+        <TextBlock FontSize="30" FontWeight="SemiBold" Text="KeySounds"/>
+        <ToggleSwitch IsChecked="{Binding IsEnabled}" OnContent="Keyboard sounds enabled" OffContent="Keyboard sounds disabled"/>
+        <Grid ColumnDefinitions="150,320" RowDefinitions="Auto,Auto" ColumnSpacing="14" RowSpacing="12">
+          <TextBlock Grid.Row="0" VerticalAlignment="Center" Text="Active profile"/><ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}"/>
+          <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="Global volume"/><Slider Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding GlobalVolume}" TickFrequency="0.05"/>
         </Grid>
-        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="18" RowSpacing="10">
+        <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
           <TextBlock Grid.Row="0" Text="Input" FontWeight="SemiBold"/><TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding InputStatus}"/>
           <TextBlock Grid.Row="1" Text="Audio" FontWeight="SemiBold"/><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding AudioStatus}"/>
-          <TextBlock Grid.Row="2" Text="Click triggers" FontWeight="SemiBold"/><TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ClickCount}"/>
+          <TextBlock Grid.Row="2" Text="Sound packs" FontWeight="SemiBold"/><TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SoundPackStatus}"/>
+          <TextBlock Grid.Row="3" Text="Sample cache" FontWeight="SemiBold"/><TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SampleCacheStatus}"/>
+          <TextBlock Grid.Row="4" Text="Triggers" FontWeight="SemiBold"/><TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding ClickCount}"/>
         </Grid>
-        <Border Background="#16000000" CornerRadius="6" Padding="14">
-          <TextBlock TextWrapping="Wrap" Text="Privacy: key events are processed transiently. Typed text is not stored, displayed, or transmitted."/>
-        </Border>
-        <TextBlock Foreground="Crimson" TextWrapping="Wrap" Text="{Binding ErrorMessage}"/>
-        <TextBlock Foreground="DarkGoldenrod" TextWrapping="Wrap" Text="{Binding SettingsStatus}"/>
-        <TextBlock Text="{Binding SoundPackStatus}"/>
-        <TextBlock Text="{Binding SampleCacheStatus}"/>
-      </StackPanel>
-    </Border>
+        <TextBlock Text="{Binding ProfilesPage.ProfileCount, StringFormat='Saved profiles: {0}'}"/>
+        <TextBlock Text="{Binding ProfilesPage.IsDirty, StringFormat='Editor has unsaved changes: {0}'}"/>
+        <Border Background="#16000000" CornerRadius="6" Padding="14"><TextBlock TextWrapping="Wrap" Text="Privacy: key events are processed transiently. Typed text is not stored, displayed, or transmitted."/></Border>
+        <TextBlock Foreground="Crimson" TextWrapping="Wrap" Text="{Binding ErrorMessage}"/><TextBlock Foreground="DarkGoldenrod" TextWrapping="Wrap" Text="{Binding SettingsStatus}"/>
+      </StackPanel></ScrollViewer>
+    </TabItem>
+    <TabItem Header="Profiles" DataContext="{Binding ProfilesPage}">
+      <Grid x:DataType="vm:ProfilesPageViewModel" Margin="12" ColumnDefinitions="280,12,*">
+        <Grid Grid.Column="0" RowDefinitions="Auto,*,Auto" RowSpacing="10">
+          <TextBlock FontSize="24" FontWeight="SemiBold" Text="Profiles"/>
+          <ListBox Grid.Row="1" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}">
+            <ListBox.ItemTemplate><DataTemplate x:DataType="vm:ProfileListItemViewModel"><StackPanel Margin="6"><TextBlock FontWeight="SemiBold" Text="{Binding Name}"/><TextBlock FontSize="12" Opacity="0.75" Text="{Binding Status}"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
+          </ListBox>
+          <WrapPanel Grid.Row="2"><Button Margin="0,0,6,6" Content="New" Command="{Binding CreateCommand}"/><Button Margin="0,0,6,6" Content="Duplicate" Command="{Binding DuplicateCommand}"/><Button Margin="0,0,6,6" Content="Delete" Command="{Binding DeleteCommand}"/><Button Margin="0,0,6,6" Content="Import" Command="{Binding ImportCommand}"/><Button Margin="0,0,6,6" Content="Export" Command="{Binding ExportCommand}"/></WrapPanel>
+        </Grid>
+        <Border Grid.Column="1" Width="1" Background="#30000000"/>
+        <ScrollViewer Grid.Column="2" DataContext="{Binding Editor}">
+          <StackPanel x:DataType="vm:ProfileEditorViewModel" Margin="16,0" Spacing="14">
+            <Grid ColumnDefinitions="*,Auto"><TextBlock FontSize="24" FontWeight="SemiBold" Text="Profile editor"/><TextBlock Grid.Column="1" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding IsDirty, StringFormat='Unsaved: {0}'}"/></Grid>
+            <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
+              <TextBlock Grid.Row="0" Text="Name"/><TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Name}"/>
+              <TextBlock Grid.Row="1" Text="Description"/><TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Description}"/>
+              <TextBlock Grid.Row="2" Text="Master volume"/><Slider Grid.Row="2" Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding MasterVolume}"/>
+              <TextBlock Grid.Row="3" Text="Playback"/><StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="16"><CheckBox IsChecked="{Binding Enabled}" Content="Enabled"/><CheckBox IsChecked="{Binding PlayOnKeyDown}" Content="Key down"/><CheckBox IsChecked="{Binding PlayOnKeyUp}" Content="Key up"/></StackPanel>
+              <TextBlock Grid.Row="4" Text="Repeat mode"/><ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding RepeatModes}" SelectedItem="{Binding RepeatMode}"/>
+              <TextBlock Grid.Row="5" Text="Repeat interval (ms)"/><NumericUpDown Grid.Row="5" Grid.Column="1" Minimum="20" Maximum="2000" Value="{Binding RepeatInterval}"/>
+            </Grid>
+            <TextBlock FontSize="18" FontWeight="SemiBold" Text="Key groups"/>
+            <ItemsControl ItemsSource="{Binding Groups}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:GroupEditorViewModel">
+              <Border BorderBrush="#30000000" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,8"><StackPanel Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="10"><CheckBox IsChecked="{Binding Enabled}"/><TextBlock FontWeight="SemiBold" Text="{Binding DisplayName}"/></StackPanel>
+                <Grid ColumnDefinitions="100,150,90,150,80,150" ColumnSpacing="8"><TextBlock Text="Pack"/><ComboBox Grid.Column="1" ItemsSource="{Binding Packs}" SelectedItem="{Binding PackId}"/><TextBlock Grid.Column="2" Text="Down set"/><ComboBox Grid.Column="3" ItemsSource="{Binding SoundSets}" SelectedItem="{Binding DownSetId}"/><Button Grid.Column="4" Content="Preview" Command="{Binding PreviewDownCommand}"/></Grid>
+                <Grid ColumnDefinitions="100,150,90,150,80,150" ColumnSpacing="8"><TextBlock Text="Up set"/><ComboBox Grid.Column="1" ItemsSource="{Binding SoundSets}" SelectedItem="{Binding UpSetId}"/><Button Grid.Column="2" Content="Preview" Command="{Binding PreviewUpCommand}"/><TextBlock Grid.Column="3" Text="Variation"/><ComboBox Grid.Column="4" Grid.ColumnSpan="2" ItemsSource="{Binding VariationModes}" SelectedItem="{Binding VariationMode}"/></Grid>
+                <Grid ColumnDefinitions="100,*,100,*,120,*" ColumnSpacing="8"><TextBlock Text="Volume"/><Slider Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding Volume}"/><TextBlock Grid.Column="2" Text="Pitch ± semitones"/><Slider Grid.Column="3" Minimum="0" Maximum="3" Value="{Binding PitchVariation}"/><TextBlock Grid.Column="4" Text="Volume variation"/><Slider Grid.Column="5" Minimum="0" Maximum="0.2" Value="{Binding VolumeVariation}"/></Grid>
+              </StackPanel></Border>
+            </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+            <TextBlock FontSize="18" FontWeight="SemiBold" Text="Per-key overrides"/>
+            <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="Capture key" Command="{Binding CaptureCommand}"/><Button Content="Cancel capture" Command="{Binding CancelCaptureCommand}"/><TextBlock VerticalAlignment="Center" Text="{Binding CaptureStatus}"/></StackPanel>
+            <ItemsControl ItemsSource="{Binding Overrides}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:OverrideEditorViewModel"><Grid ColumnDefinitions="110,Auto,95,95,95,80,80,80,120,Auto" Margin="0,4" ColumnSpacing="6"><TextBlock Text="{Binding Label}"/><CheckBox Grid.Column="1" IsChecked="{Binding Enabled}" Content="Enabled"/><TextBox Grid.Column="2" PlaceholderText="Optional pack" Text="{Binding PackId}"/><TextBox Grid.Column="3" PlaceholderText="Down set" Text="{Binding DownSetId}"/><TextBox Grid.Column="4" PlaceholderText="Up set" Text="{Binding UpSetId}"/><NumericUpDown Grid.Column="5" Minimum="0" Maximum="1" Value="{Binding Volume}"/><NumericUpDown Grid.Column="6" Minimum="0" Maximum="3" Value="{Binding PitchVariation}"/><NumericUpDown Grid.Column="7" Minimum="0" Maximum="0.2" Increment="0.01" Value="{Binding VolumeVariation}"/><ComboBox Grid.Column="8" ItemsSource="{Binding VariationModes}" SelectedItem="{Binding VariationMode}"/><Button Grid.Column="9" Content="Remove" Command="{Binding RemoveCommand}"/></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+            <Border Background="#12FF0000" Padding="10"><TextBlock TextWrapping="Wrap" Text="{Binding ValidationSummary}"/></Border>
+            <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="Save" Command="{Binding $parent[TabItem].DataContext.SaveCommand}"/><Button Content="Save and activate" Command="{Binding $parent[TabItem].DataContext.SaveAndActivateCommand}"/><Button Content="Activate saved" Command="{Binding $parent[TabItem].DataContext.ActivateCommand}"/><Button Content="Revert" Command="{Binding RevertCommand}"/></StackPanel>
+            <TextBlock TextWrapping="Wrap" Text="{Binding $parent[TabItem].DataContext.Status}"/>
+          </StackPanel>
+        </ScrollViewer>
+      </Grid>
+    </TabItem>
+  </TabControl>
 </Window>

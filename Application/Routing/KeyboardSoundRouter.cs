@@ -54,8 +54,9 @@ public sealed class KeyboardSoundRouter(ActiveProfileService profiles, KeyGroupR
         var pack = keyOverride?.PackId ?? mapping.PackId;
         var set = isDown ? keyOverride?.DownSetId ?? mapping.DownSetId : keyOverride?.UpSetId ?? mapping.UpSetId;
         if (string.IsNullOrWhiteSpace(set) || !catalog.TryGetFiles(pack, set, out var files) || files.Count == 0) return null;
-        var file = variations.Select($"{pack}/{set}", files, mapping.VariationMode);
-        var variation = mapping.VolumeVariation == 0 ? 1f : 1f + ((Random.Shared.NextSingle() * 2 - 1) * mapping.VolumeVariation);
+        var file = variations.Select($"{pack}/{set}", files, keyOverride?.VariationMode ?? mapping.VariationMode);
+        var volumeVariation = keyOverride?.VolumeVariation ?? mapping.VolumeVariation;
+        var variation = volumeVariation == 0 ? 1f : 1f + ((Random.Shared.NextSingle() * 2 - 1) * volumeVariation);
         var gain = Math.Clamp(GlobalVolume * profile.MasterGain * (keyOverride?.Gain ?? mapping.Gain) * variation, 0, 1);
         var pitchRange = keyOverride?.PitchVariation ?? mapping.PitchVariation;
         var pitch = pitchRange == 0 ? 0 : (Random.Shared.NextSingle() * 2 - 1) * pitchRange;

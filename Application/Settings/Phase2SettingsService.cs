@@ -27,16 +27,8 @@ public sealed class Phase2SettingsService(JsonApplicationSettingsRepository sett
         if (catalog is not null) await catalog.InitializeAsync(token);
         Settings = loaded.Settings;
         StatusMessage = loaded.RecoveryMessage;
-        var profiles = (await profileRepository.ListAsync(token)).ToList();
-        var migration = new FallbackProfileMigrationService(profileRepository);
-        foreach (var profile in profiles) await migration.MigrateAsync(profile, token);
-        if (profiles.All(profile => profile.Id != "default"))
-        {
-            var fallback = Phase2Defaults.CreateProfile();
-            await profileRepository.SaveAsync(fallback, token);
-            profiles.Insert(0, fallback);
-        }
-        Profiles = profiles;
+        await ReloadProfilesAsync(token);
+        var profiles = Profiles.ToList();
         var selected = profiles.FirstOrDefault(profile => profile.Id == Settings.ActiveProfileId) ?? profiles[0];
         if (sampleCache is not null)
         {
@@ -81,6 +73,18 @@ public sealed class Phase2SettingsService(JsonApplicationSettingsRepository sett
     }
 
     public Task RefreshPacksAsync(CancellationToken token = default) => catalog?.RefreshAsync(token) ?? Task.CompletedTask;
+    public async Task ReloadProfilesAsync(CancellationToken token = default)
+    {
+        var profiles = (await profileRepository.ListAsync(token)).ToList();
+        var migration = new FallbackProfileMigrationService(profileRepository);
+        foreach (var profile in profiles) await migration.MigrateAsync(profile, token);
+        if (profiles.All(profile => profile.Id != "default"))
+        {
+            var fallback = Phase2Defaults.CreateProfile(); await profileRepository.SaveAsync(fallback, token); profiles.Insert(0, fallback);
+        }
+        Profiles = profiles.OrderBy(profile => profile.Id == "default" ? 0 : 1).ThenBy(profile => profile.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
+        if (profileRepository.LastLoadIssues.Count > 0) StatusMessage = string.Join(Environment.NewLine, profileRepository.LastLoadIssues);
+    }
     private static IReadOnlyCollection<SoundSetReference> GetRequiredSets(CompiledSoundProfile profile)
     {
         var required = profile.Groups.Values.Where(item => item.Enabled)

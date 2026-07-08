@@ -18,6 +18,7 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
     private Task? _startTask;
     private Task? _stopTask;
     private bool _terminal;
+    private TaskCompletionSource<KeyIdentifier>? _capture;
 
     public KeyboardSoundCoordinator(IKeyboardInputSource input, IAudioEngine audio, KeyboardSoundRouter? router = null)
     {
@@ -28,7 +29,8 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
     public string InputStatus { get; private set; } = "Stopped";
     public string AudioStatus { get; private set; } = "Stopped";
     public string? ErrorMessage { get; private set; }
-    public long ClickCount { get; private set; }
+    private long _clickCount;
+    public long ClickCount => Interlocked.Read(ref _clickCount);
     public event EventHandler? StatusChanged;
 
     public Task StartAsync(CancellationToken token = default)
@@ -60,7 +62,26 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
         Changed();
     }
 
-    private void OnInput(object? sender, KeyboardInputEvent value) => _events.Writer.TryWrite(value);
+    private void OnInput(object? sender, KeyboardInputEvent value)
+    {
+        var capture = Volatile.Read(ref _capture);
+        if (capture is not null && value.Action == KeyboardAction.KeyDown && capture.TrySetResult(new(value.ScanCode, value.IsExtended)))
+        {
+            Interlocked.CompareExchange(ref _capture, null, capture);
+            return;
+        }
+        _events.Writer.TryWrite(value);
+    }
+    public async Task<KeyIdentifier> CaptureNextKeyAsync(CancellationToken token = default)
+    {
+        lock (_lifecycleGate) if (_terminal) throw new ObjectDisposedException(nameof(KeyboardSoundCoordinator));
+        var completion = new TaskCompletionSource<KeyIdentifier>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (Interlocked.CompareExchange(ref _capture, completion, null) is not null) throw new InvalidOperationException("A key capture is already active.");
+        using var registration = token.Register(() => completion.TrySetCanceled(token));
+        try { return await completion.Task.ConfigureAwait(false); }
+        finally { Interlocked.CompareExchange(ref _capture, null, completion); }
+    }
+    public void CancelKeyCapture() => Interlocked.Exchange(ref _capture, null)?.TrySetCanceled();
     private void OnInputFailure(object? sender, InputFailureEventArgs value) { InputStatus = "Error"; ErrorMessage = value.Exception.Message; Changed(); }
 
     private async Task ConsumeAsync(CancellationToken token)
@@ -71,7 +92,7 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
             {
                 var trigger = _router.Route(value);
                 if (!IsEnabled || !_audio.IsInitialized || trigger is null) continue;
-                _audio.Play(trigger.Value); ClickCount++; Changed();
+                _audio.Play(trigger.Value); Interlocked.Increment(ref _clickCount);
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
@@ -92,6 +113,7 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
         _input.InputReceived -= OnInput;
         _input.Failure -= OnInputFailure;
         _cts?.Cancel();
+        CancelKeyCapture();
         try { await _input.StopAsync().ConfigureAwait(false); } catch (Exception ex) { (failures ??= []).Add(ex); }
         if (_consumer is not null) try { await _consumer.ConfigureAwait(false); } catch (Exception ex) { (failures ??= []).Add(ex); }
         _router.ClearState();

@@ -25,21 +25,53 @@ public sealed class JsonApplicationSettingsRepository(StoragePaths paths, Atomic
 
 public sealed class JsonProfileRepository(StoragePaths paths, AtomicFileWriter writer)
 {
+    public string ProfilesDirectory => paths.ProfilesDirectory;
+    public IReadOnlyList<string> LastLoadIssues { get; private set; } = [];
     public async Task<IReadOnlyList<SoundProfile>> ListAsync(CancellationToken token = default)
     {
         Directory.CreateDirectory(paths.ProfilesDirectory); writer.CleanTemporaryFiles(paths.ProfilesDirectory);
-        var profiles = new List<SoundProfile>();
+        var profiles = new List<SoundProfile>(); var issues = new List<string>();
         foreach (var file in Directory.EnumerateFiles(paths.ProfilesDirectory, "*.json"))
         {
             var profile = await TryReadAsync(file, token);
             if (profile is not null) profiles.Add(profile);
+            else
+            {
+                var backup = await TryReadAsync(file + ".backup", token);
+                if (backup is not null) { profiles.Add(backup); issues.Add($"Recovered '{Path.GetFileName(file)}' from backup."); }
+                else issues.Add($"Could not load malformed profile '{Path.GetFileName(file)}'.");
+            }
         }
+        LastLoadIssues = issues.AsReadOnly();
         return profiles;
     }
     public Task SaveAsync(SoundProfile profile, CancellationToken token = default)
     {
         if (!IsSafeId(profile.Id)) throw new ArgumentException("Profile ID contains unsupported characters.");
         return writer.WriteJsonAsync(Path.Combine(paths.ProfilesDirectory, profile.Id + ".json"), profile, token);
+    }
+    public async Task<SoundProfile?> LoadAsync(string id, CancellationToken token = default)
+    {
+        if (!IsSafeId(id)) return null;
+        var path = Path.Combine(paths.ProfilesDirectory, id + ".json");
+        var profile = await TryReadAsync(path, token);
+        if (profile is not null) return profile;
+        return await TryReadAsync(path + ".backup", token);
+    }
+    public Task DeleteAsync(string id, CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+        if (!IsSafeId(id)) throw new ArgumentException("Profile ID contains unsupported characters.");
+        var path = Path.Combine(paths.ProfilesDirectory, id + ".json");
+        var trash = path + $".delete-{Guid.NewGuid():N}";
+        if (File.Exists(path))
+        {
+            File.Move(path, trash);
+            try { File.Delete(trash); }
+            catch { if (!File.Exists(path) && File.Exists(trash)) File.Move(trash, path); throw; }
+        }
+        if (File.Exists(path + ".backup")) File.Delete(path + ".backup");
+        return Task.CompletedTask;
     }
     private static bool IsSafeId(string id) => !string.IsNullOrWhiteSpace(id) && id.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_');
     private static async Task<SoundProfile?> TryReadAsync(string path, CancellationToken token)
