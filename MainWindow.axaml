@@ -5,12 +5,18 @@
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         xmlns:vm="using:KeySounds.ViewModels"
         x:DataType="vm:MainWindowViewModel"
-        x:Class="KeySounds.MainWindow" Width="520" Height="360"
-        CanResize="False" Title="KeySounds — Technical Proof of Concept">
+        x:Class="KeySounds.MainWindow" Width="560" Height="480"
+        CanResize="False" Title="KeySounds">
     <Border Padding="28">
       <StackPanel Spacing="18">
         <TextBlock FontSize="28" FontWeight="SemiBold" Text="KeySounds" />
         <ToggleSwitch IsChecked="{Binding IsEnabled}" OnContent="Keyboard sounds enabled" OffContent="Keyboard sounds disabled" />
+        <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto" ColumnSpacing="14" RowSpacing="12">
+          <TextBlock Grid.Row="0" VerticalAlignment="Center" Text="Active profile"/>
+          <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}"/>
+          <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="Global volume"/>
+          <Slider Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding GlobalVolume}" TickFrequency="0.05"/>
+        </Grid>
         <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="18" RowSpacing="10">
           <TextBlock Grid.Row="0" Text="Input" FontWeight="SemiBold"/><TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding InputStatus}"/>
           <TextBlock Grid.Row="1" Text="Audio" FontWeight="SemiBold"/><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding AudioStatus}"/>
@@ -20,6 +26,7 @@
           <TextBlock TextWrapping="Wrap" Text="Privacy: key events are processed transiently. Typed text is not stored, displayed, or transmitted."/>
         </Border>
         <TextBlock Foreground="Crimson" TextWrapping="Wrap" Text="{Binding ErrorMessage}"/>
+        <TextBlock Foreground="DarkGoldenrod" TextWrapping="Wrap" Text="{Binding SettingsStatus}"/>
       </StackPanel>
     </Border>
 </Window>

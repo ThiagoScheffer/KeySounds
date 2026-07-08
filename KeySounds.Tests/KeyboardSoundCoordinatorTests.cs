@@ -95,6 +95,7 @@ public sealed class KeyboardSoundCoordinatorTests
     {
         public bool IsInitialized { get; private set; } public int Plays; public int Shutdowns; public List<string>? Order;
         public Task InitializeAsync(CancellationToken cancellationToken = default) { IsInitialized = true; return Task.CompletedTask; }
+        public void Play(SoundTrigger trigger) => Interlocked.Increment(ref Plays);
         public void PlayClick() => Interlocked.Increment(ref Plays);
         public Task ShutdownAsync(CancellationToken cancellationToken = default) { IsInitialized = false; Shutdowns++; Order?.Add("audio"); return Task.CompletedTask; }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;

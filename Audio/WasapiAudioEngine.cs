@@ -60,12 +60,15 @@ public sealed class WasapiAudioEngine(string assetUri) : IAudioEngine
     }
 
     public void PlayClick()
+        => Play(new SoundTrigger(new SoundId("builtin", "click", "key-click.wav"), 1f, 0f));
+
+    public void Play(SoundTrigger trigger)
     {
         lock (_gate)
         {
             if (_state != AudioState.Initialized || _samples is null || _mixer is null || _activeVoices >= 32) return;
             _activeVoices++;
-            try { _mixer.AddMixerInput(new CachedVoice(_samples, this)); }
+            try { _mixer.AddMixerInput(new CachedVoice(_samples, this, Math.Clamp(trigger.Gain, 0, 1), Math.Clamp(trigger.PitchSemitones, -3, 3))); }
             catch { _activeVoices--; throw; }
         }
     }
@@ -109,17 +112,30 @@ public sealed class WasapiAudioEngine(string assetUri) : IAudioEngine
     private void VoiceCompleted() => Interlocked.Decrement(ref _activeVoices);
     public async ValueTask DisposeAsync() => await ShutdownAsync().ConfigureAwait(false);
 
-    private sealed class CachedVoice(float[] samples, WasapiAudioEngine owner) : ISampleProvider
+    private sealed class CachedVoice(float[] samples, WasapiAudioEngine owner, float gain, float pitchSemitones) : ISampleProvider
     {
-        private int _position, _completed;
+        private readonly double _step = Math.Pow(2, pitchSemitones / 12d);
+        private double _framePosition;
+        private int _completed;
         public WaveFormat WaveFormat { get; } = WaveFormat.CreateIeeeFloatWaveFormat(48000, 2);
         public int Read(float[] buffer, int offset, int count)
         {
-            var available = Math.Min(count, samples.Length - _position);
-            Array.Copy(samples, _position, buffer, offset, available);
-            _position += available;
-            if (_position >= samples.Length && Interlocked.Exchange(ref _completed, 1) == 0) owner.VoiceCompleted();
-            return available;
+            var requestedFrames = count / 2;
+            var sourceFrames = samples.Length / 2;
+            var writtenFrames = 0;
+            while (writtenFrames < requestedFrames && _framePosition < sourceFrames - 1)
+            {
+                var frame = (int)_framePosition;
+                var fraction = (float)(_framePosition - frame);
+                var target = offset + writtenFrames * 2;
+                var source = frame * 2;
+                buffer[target] = (samples[source] + (samples[source + 2] - samples[source]) * fraction) * gain;
+                buffer[target + 1] = (samples[source + 1] + (samples[source + 3] - samples[source + 1]) * fraction) * gain;
+                _framePosition += _step;
+                writtenFrames++;
+            }
+            if (_framePosition >= sourceFrames - 1 && Interlocked.Exchange(ref _completed, 1) == 0) owner.VoiceCompleted();
+            return writtenFrames * 2;
         }
     }
 }

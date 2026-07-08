@@ -1,6 +1,7 @@
 using System.Threading.Channels;
 using KeySounds.Core.Audio;
 using KeySounds.Core.Input;
+using KeySounds.Application.Routing;
 
 namespace KeySounds.Application;
 
@@ -10,7 +11,7 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
     private readonly IAudioEngine _audio;
     private readonly Channel<KeyboardInputEvent> _events = Channel.CreateBounded<KeyboardInputEvent>(new BoundedChannelOptions(256)
     { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true, SingleWriter = false });
-    private readonly HashSet<(nint Device, ushort ScanCode)> _pressed = [];
+    private readonly KeyboardSoundRouter _router;
     private readonly object _lifecycleGate = new();
     private CancellationTokenSource? _cts;
     private Task? _consumer;
@@ -18,7 +19,11 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
     private Task? _stopTask;
     private bool _terminal;
 
-    public KeyboardSoundCoordinator(IKeyboardInputSource input, IAudioEngine audio) { _input = input; _audio = audio; }
+    public KeyboardSoundCoordinator(IKeyboardInputSource input, IAudioEngine audio, KeyboardSoundRouter? router = null)
+    {
+        _input = input; _audio = audio;
+        _router = router ?? Phase2Defaults.CreateRouter();
+    }
     public bool IsEnabled { get; set; } = true;
     public string InputStatus { get; private set; } = "Stopped";
     public string AudioStatus { get; private set; } = "Stopped";
@@ -64,10 +69,9 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
         {
             await foreach (var value in _events.Reader.ReadAllAsync(token))
             {
-                var key = (value.DeviceHandle, value.ScanCode);
-                if (value.Action == KeyboardAction.KeyUp) { _pressed.Remove(key); continue; }
-                if (!_pressed.Add(key) || !IsEnabled || !_audio.IsInitialized) continue;
-                _audio.PlayClick(); ClickCount++; Changed();
+                var trigger = _router.Route(value);
+                if (!IsEnabled || !_audio.IsInitialized || trigger is null) continue;
+                _audio.Play(trigger.Value); ClickCount++; Changed();
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
@@ -90,7 +94,7 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
         _cts?.Cancel();
         try { await _input.StopAsync().ConfigureAwait(false); } catch (Exception ex) { (failures ??= []).Add(ex); }
         if (_consumer is not null) try { await _consumer.ConfigureAwait(false); } catch (Exception ex) { (failures ??= []).Add(ex); }
-        _pressed.Clear();
+        _router.ClearState();
         try { await _audio.ShutdownAsync().ConfigureAwait(false); } catch (Exception ex) { (failures ??= []).Add(ex); }
         InputStatus = AudioStatus = "Stopped"; Changed();
         if (failures is not null) throw new AggregateException("One or more services failed to shut down cleanly.", failures);
