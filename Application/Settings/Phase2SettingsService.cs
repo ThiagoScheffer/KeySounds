@@ -6,11 +6,12 @@ using KeySounds.Infrastructure.Persistence;
 using KeySounds.Application.SoundPacks;
 using KeySounds.Audio;
 using KeySounds.Core.SoundPacks;
+using KeySounds.Core.Audio;
 
 namespace KeySounds.Application.Settings;
 
 public sealed class Phase2SettingsService(JsonApplicationSettingsRepository settingsRepository, JsonProfileRepository profileRepository, ActiveProfileService activeProfiles, KeyboardSoundRouter router,
-    ISoundSampleCache? sampleCache = null, SoundPackCatalogService? catalog = null) : IAsyncDisposable
+    ISoundSampleCache? sampleCache = null, SoundPackCatalogService? catalog = null, ISelectableAudioEngine? selectableAudio = null) : IAsyncDisposable
 {
     private readonly SemaphoreSlim _activationGate = new(1, 1);
     private bool _shutdown;
@@ -26,6 +27,8 @@ public sealed class Phase2SettingsService(JsonApplicationSettingsRepository sett
         var loaded = await settingsRepository.LoadAsync(token);
         if (catalog is not null) await catalog.InitializeAsync(token);
         Settings = loaded.Settings;
+        if (ApplicationSettingsMigration.Apply(Settings)) await settingsRepository.SaveAsync(Settings, token);
+        selectableAudio?.ConfigureStartup(Settings.AudioOutputSelection, Settings.AudioLatencyMilliseconds);
         StatusMessage = loaded.RecoveryMessage;
         await ReloadProfilesAsync(token);
         var profiles = Profiles.ToList();
@@ -47,6 +50,13 @@ public sealed class Phase2SettingsService(JsonApplicationSettingsRepository sett
 
     public async Task SetEnabledAsync(bool enabled, CancellationToken token = default) { Settings.SoundsEnabled = enabled; await settingsRepository.SaveAsync(Settings, token); }
     public async Task SetGlobalVolumeAsync(float volume, CancellationToken token = default) { Settings.GlobalVolume = Math.Clamp(volume, 0, 1); router.GlobalVolume = Settings.GlobalVolume; await settingsRepository.SaveAsync(Settings, token); }
+    public async Task SaveAudioConfigurationAsync(AudioOutputSelection selection, int latency, CancellationToken token = default)
+    {
+        var oldSelection = Settings.AudioOutputSelection; var oldLatency = Settings.AudioLatencyMilliseconds; var oldLegacyId = Settings.AudioOutputDeviceId;
+        Settings.AudioOutputSelection = selection; Settings.AudioLatencyMilliseconds = latency; Settings.AudioOutputDeviceId = selection.Kind == AudioOutputSelectionKind.SpecificDevice ? selection.DeviceId : null;
+        try { await settingsRepository.SaveAsync(Settings, token); }
+        catch { Settings.AudioOutputSelection = oldSelection; Settings.AudioLatencyMilliseconds = oldLatency; Settings.AudioOutputDeviceId = oldLegacyId; throw; }
+    }
     public async Task ActivateAsync(string profileId, CancellationToken token = default)
     {
         await _activationGate.WaitAsync(token);

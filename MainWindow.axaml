@@ -21,6 +21,9 @@
         </Grid>
         <TextBlock Text="{Binding ProfilesPage.ProfileCount, StringFormat='Saved profiles: {0}'}"/>
         <TextBlock Text="{Binding ProfilesPage.IsDirty, StringFormat='Editor has unsaved changes: {0}'}"/>
+        <TextBlock Text="{Binding AudioPage.EngineSummary}"/>
+        <TextBlock Text="{Binding AudioPage.EffectiveOutput, StringFormat='Current output: {0}'}"/>
+        <TextBlock Text="{Binding AudioPage.FallbackStatus}"/>
         <Border Background="#16000000" CornerRadius="6" Padding="14"><TextBlock TextWrapping="Wrap" Text="Privacy: key events are processed transiently. Typed text is not stored, displayed, or transmitted."/></Border>
         <TextBlock Foreground="Crimson" TextWrapping="Wrap" Text="{Binding ErrorMessage}"/><TextBlock Foreground="DarkGoldenrod" TextWrapping="Wrap" Text="{Binding SettingsStatus}"/>
       </StackPanel></ScrollViewer>
@@ -64,6 +67,22 @@
           </StackPanel>
         </ScrollViewer>
       </Grid>
+    </TabItem>
+    <TabItem Header="Audio" DataContext="{Binding AudioPage}">
+      <ScrollViewer><StackPanel x:DataType="vm:AudioSettingsViewModel" Margin="24" Spacing="18" MaxWidth="720" HorizontalAlignment="Left">
+        <TextBlock FontSize="28" FontWeight="SemiBold" Text="Audio output"/>
+        <Grid ColumnDefinitions="180,420" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="14" RowSpacing="12">
+          <TextBlock Grid.Row="0" Text="Configured output" FontWeight="SemiBold"/><TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ConfiguredOutput}"/>
+          <TextBlock Grid.Row="1" Text="Currently active" FontWeight="SemiBold"/><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding EffectiveOutput}"/>
+          <TextBlock Grid.Row="2" Text="Runtime mode" FontWeight="SemiBold"/><TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding FallbackStatus}"/>
+          <TextBlock Grid.Row="3" Text="Engine" FontWeight="SemiBold"/><TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding EngineSummary}"/>
+          <TextBlock Grid.Row="4" Text="Output selection"/><ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding Options}" SelectedItem="{Binding SelectedOption}"/>
+          <TextBlock Grid.Row="5" Text="Shared-mode latency"/><ComboBox Grid.Row="5" Grid.Column="1" ItemsSource="{Binding Latencies}" SelectedItem="{Binding SelectedLatency}"/>
+        </Grid>
+        <TextBlock TextWrapping="Wrap" Text="Lower latency may be less stable on some devices. Changes briefly pause playback while the output is reinitialized."/>
+        <WrapPanel><Button Margin="0,0,8,8" Content="Refresh devices" Command="{Binding RefreshCommand}"/><Button Margin="0,0,8,8" Content="Apply output" Command="{Binding ApplyCommand}"/><Button Margin="0,0,8,8" Content="Use system default" Command="{Binding UseDefaultCommand}"/><Button Margin="0,0,8,8" Content="Retry configured device" Command="{Binding RetryCommand}"/><Button Margin="0,0,8,8" Content="Test sound" Command="{Binding TestSoundCommand}"/></WrapPanel>
+        <Border Background="#16000000" CornerRadius="6" Padding="12"><TextBlock TextWrapping="Wrap" Text="{Binding Message}"/></Border>
+      </StackPanel></ScrollViewer>
     </TabItem>
   </TabControl>
 </Window>

@@ -11,12 +11,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly KeyboardSoundCoordinator _coordinator;
     private readonly Phase2SettingsService? _settings;
     private readonly DispatcherTimer _counterTimer;
-    public MainWindowViewModel(KeyboardSoundCoordinator coordinator, Phase2SettingsService? settings = null, ProfilesPageViewModel? profilesPage = null)
+    public MainWindowViewModel(KeyboardSoundCoordinator coordinator, Phase2SettingsService? settings = null, ProfilesPageViewModel? profilesPage = null, AudioSettingsViewModel? audioPage = null)
     {
-        _coordinator = coordinator; _settings = settings; ProfilesPage = profilesPage; coordinator.StatusChanged += OnChanged;
+        _coordinator = coordinator; _settings = settings; ProfilesPage = profilesPage; AudioPage = audioPage; coordinator.StatusChanged += OnChanged;
         _counterTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (_, _) => Raise(nameof(ClickCount)));
     }
     public ProfilesPageViewModel? ProfilesPage { get; }
+    public AudioSettingsViewModel? AudioPage { get; }
     public bool IsEnabled { get => _coordinator.IsEnabled; set { _coordinator.IsEnabled = value; Raise(); Persist(() => _settings?.SetEnabledAsync(value)); } }
     public string InputStatus => _coordinator.InputStatus;
     public string AudioStatus => _coordinator.AudioStatus;
@@ -50,9 +51,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         if (_settings is not null) { await _settings.InitializeAsync(token); _coordinator.IsEnabled = _settings.Settings.SoundsEnabled; }
         if (ProfilesPage is not null) await ProfilesPage.InitializeAsync();
         await _coordinator.StartAsync(token);
+        if (AudioPage is not null) await AudioPage.InitializeAsync();
         _counterTimer.Start();
         Raise(nameof(Profiles)); Raise(nameof(SelectedProfile)); Raise(nameof(GlobalVolume)); Raise(nameof(IsEnabled)); Raise(nameof(SettingsStatus)); Raise(nameof(SoundPackStatus)); Raise(nameof(SampleCacheStatus));
         Raise(nameof(ProfilesPage));
+        Raise(nameof(AudioPage));
     }
     public Task StopAsync() { _counterTimer.Stop(); return _coordinator.StopAsync(); }
     public void ReportShutdownError(Exception exception) { _shutdownError = exception.Message; Raise(nameof(ErrorMessage)); }

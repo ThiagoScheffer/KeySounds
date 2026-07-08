@@ -45,7 +45,7 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
     private async Task StartCoreAsync()
     {
         _cts = new CancellationTokenSource();
-        try { AudioStatus = "Starting"; Changed(); await _audio.InitializeAsync(_cts.Token); AudioStatus = "Active"; }
+        try { AudioStatus = "Starting"; Changed(); await _audio.InitializeAsync(_cts.Token); AudioStatus = _audio.IsInitialized ? "Active" : "Device error"; if (!_audio.IsInitialized) ErrorMessage = "No usable audio output is currently available."; }
         catch (Exception ex) { AudioStatus = ex is FileNotFoundException ? "Missing sample" : "Device error"; ErrorMessage = ex.Message; }
         try
         {
