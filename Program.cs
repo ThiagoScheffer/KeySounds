@@ -1,23 +1,33 @@
 using Avalonia;
 using KeySounds.Application.Diagnostics;
+using KeySounds.Application.SystemIntegration;
 using KeySounds.Infrastructure.Persistence;
 using System;
+using System.Runtime.Versioning;
 
 namespace KeySounds;
 
+[SupportedOSPlatform("windows")]
 class Program
 {
-    // Initialization code. Don't use any Avalonia, third-party APIs or any
-    // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
-    // yet and stuff might break.
+    internal static SingleInstanceCoordinator? SingleInstance { get; private set; }
+
     [STAThread]
     public static void Main(string[] args)
     {
         if (TryRunDiagnostics(args)) return;
+        using var singleInstance = new SingleInstanceCoordinator();
+        if (!singleInstance.IsPrimary)
+        {
+            try { singleInstance.SignalActivationAsync().GetAwaiter().GetResult(); }
+            catch { }
+            return;
+        }
+        SingleInstance = singleInstance;
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        SingleInstance = null;
     }
 
-    // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()

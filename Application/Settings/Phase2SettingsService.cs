@@ -92,6 +92,37 @@ public sealed class Phase2SettingsService(JsonApplicationSettingsRepository sett
         var previous = Settings.KeyboardProfileAssignments; Settings.KeyboardProfileAssignments = new(assignments, StringComparer.Ordinal);
         try { await settingsRepository.SaveAsync(Settings, token); Changed?.Invoke(this, EventArgs.Empty); } catch { Settings.KeyboardProfileAssignments = previous; throw; }
     }
+    public async Task UpdatePhase3PreferencesAsync(Action<ApplicationSettings> update, CancellationToken token = default)
+    {
+        var snapshot = new ApplicationSettings
+        {
+            SchemaVersion = Settings.SchemaVersion,
+            SoundsEnabled = Settings.SoundsEnabled,
+            ActiveProfileId = Settings.ActiveProfileId,
+            AudioOutputDeviceId = Settings.AudioOutputDeviceId,
+            AudioOutputSelection = Settings.AudioOutputSelection,
+            AudioLatencyMilliseconds = Settings.AudioLatencyMilliseconds,
+            GlobalVolume = Settings.GlobalVolume,
+            MinimizeOnClose = Settings.MinimizeOnClose,
+            KeyboardDeviceProfileAssignments = new(Settings.KeyboardDeviceProfileAssignments, StringComparer.Ordinal),
+            KeyboardProfileAssignments = new(Settings.KeyboardProfileAssignments, StringComparer.Ordinal),
+            StartWithWindows = Settings.StartWithWindows,
+            MinimizeToTray = Settings.MinimizeToTray,
+            CloseToTray = Settings.CloseToTray,
+            ShowWindowOnStartup = Settings.ShowWindowOnStartup,
+            HasCompletedFirstRun = Settings.HasCompletedFirstRun,
+            EnableLocalCrashReports = Settings.EnableLocalCrashReports,
+            DiagnosticReportRetentionDays = Settings.DiagnosticReportRetentionDays
+        };
+        update(Settings);
+        Settings.DiagnosticReportRetentionDays = Math.Clamp(Settings.DiagnosticReportRetentionDays, 1, 365);
+        try { await settingsRepository.SaveAsync(Settings, token); Changed?.Invoke(this, EventArgs.Empty); }
+        catch
+        {
+            Settings = snapshot;
+            throw;
+        }
+    }
     public async Task ReloadProfilesAsync(CancellationToken token = default)
     {
         var profiles = (await profileRepository.ListAsync(token)).ToList();

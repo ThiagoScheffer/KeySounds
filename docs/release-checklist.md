@@ -5,7 +5,21 @@
 - Build: `dotnet build KeySounds.csproj -c Release`
 - Tests: `dotnet test KeySounds.Tests\KeySounds.Tests.csproj -c Release`
 - Diagnostic export: `KeySounds.exe --diagnostics diagnostics.json`
+- Portable publish: `dotnet publish KeySounds.csproj -c Release -r win-x64 --self-contained true -o artifacts/portable/win-x64`
 - Expected result: zero build warnings/errors, all tests passing, and a sanitized diagnostic JSON report with aggregate counts only.
+
+## Phase 3 distribution checks
+
+- Tray icon appears while the app is running.
+- Tray Open restores/focuses the window.
+- Tray Sounds Enabled/Disabled toggles the same Dashboard setting.
+- Close-to-tray hides without shutting down input/audio.
+- Tray Exit performs true shutdown.
+- Start with Windows writes/removes the HKCU Run value only after user action.
+- Launching a second instance activates the first and exits.
+- Diagnostics export from Settings is sanitized.
+- Local error reports are created only when enabled and retained according to settings.
+- Published portable folder runs without test assemblies.
 
 ## Clean app-data test
 

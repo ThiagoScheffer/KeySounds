@@ -11,9 +11,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly KeyboardSoundCoordinator _coordinator;
     private readonly Phase2SettingsService? _settings;
     private readonly DispatcherTimer _counterTimer;
-    public MainWindowViewModel(KeyboardSoundCoordinator coordinator, Phase2SettingsService? settings = null, ProfilesPageViewModel? profilesPage = null, AudioSettingsViewModel? audioPage = null, KeyboardsViewModel? keyboardsPage = null, SoundPacksViewModel? soundPacksPage = null)
+    public MainWindowViewModel(KeyboardSoundCoordinator coordinator, Phase2SettingsService? settings = null, ProfilesPageViewModel? profilesPage = null, AudioSettingsViewModel? audioPage = null, KeyboardsViewModel? keyboardsPage = null, SoundPacksViewModel? soundPacksPage = null, SettingsViewModel? settingsPage = null)
     {
-        _coordinator = coordinator; _settings = settings; ProfilesPage = profilesPage; AudioPage = audioPage; KeyboardsPage = keyboardsPage; SoundPacksPage = soundPacksPage; coordinator.StatusChanged += OnChanged;
+        _coordinator = coordinator; _settings = settings; ProfilesPage = profilesPage; AudioPage = audioPage; KeyboardsPage = keyboardsPage; SoundPacksPage = soundPacksPage; SettingsPage = settingsPage; coordinator.StatusChanged += OnChanged;
         if (_settings is not null) _settings.Changed += OnSettingsChanged;
         _counterTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (_, _) => { Raise(nameof(ClickCount)); Raise(nameof(TriggerDiagnostics)); });
     }
@@ -21,6 +21,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public AudioSettingsViewModel? AudioPage { get; }
     public KeyboardsViewModel? KeyboardsPage { get; }
     public SoundPacksViewModel? SoundPacksPage { get; }
+    public SettingsViewModel? SettingsPage { get; }
     public bool IsEnabled { get => _coordinator.IsEnabled; set { _coordinator.IsEnabled = value; Raise(); Persist(() => _settings?.SetEnabledAsync(value)); } }
     public string InputStatus => _coordinator.InputStatus;
     public string AudioStatus => _coordinator.AudioStatus;
@@ -66,6 +67,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         Raise(nameof(AudioPage));
         Raise(nameof(KeyboardsPage));
         Raise(nameof(SoundPacksPage));
+        Raise(nameof(SettingsPage));
         Raise(nameof(KeyboardSummary));
         Raise(nameof(RecentWarning));
     }
@@ -75,6 +77,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private void OnSettingsChanged(object? s, EventArgs e) => Dispatcher.UIThread.Post(() =>
     {
         Raise(nameof(Profiles)); Raise(nameof(SelectedProfile)); Raise(nameof(SettingsStatus)); Raise(nameof(SoundPackStatus)); Raise(nameof(SampleCacheStatus)); Raise(nameof(KeyboardSummary)); Raise(nameof(RecentWarning));
+        SettingsPage?.RefreshAll();
         ProfilesPage?.RefreshFromServices(); SoundPacksPage?.Rebuild();
     });
     public event PropertyChangedEventHandler? PropertyChanged;

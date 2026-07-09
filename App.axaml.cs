@@ -1,6 +1,10 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input;
 using Avalonia.Markup.Xaml;
+using Avalonia.Platform;
+using System.Runtime.Versioning;
 using KeySounds.Application;
 using KeySounds.Audio;
 using KeySounds.Platform.Windows.Input;
@@ -12,9 +16,12 @@ using KeySounds.Infrastructure.Persistence;
 using KeySounds.Application.SoundPacks;
 using KeySounds.Application.Audio;
 using KeySounds.Application.Keyboards;
+using KeySounds.Application.Diagnostics;
+using KeySounds.Application.SystemIntegration;
 
 namespace KeySounds;
 
+[SupportedOSPlatform("windows")]
 public partial class App : Avalonia.Application
 {
     private KeyboardSoundCoordinator? _coordinator;
@@ -35,6 +42,11 @@ public partial class App : Avalonia.Application
     private KeyboardDeviceIdentityService? _keyboardIdentity;
     private KeyboardProfileAssignmentService? _keyboardAssignments;
     private KeyboardsViewModel? _keyboardsPage;
+    private SettingsViewModel? _settingsPage;
+    private TrayIcon? _trayIcon;
+    private StoragePaths? _paths;
+    private LocalErrorReportService? _errorReports;
+    private bool _exitRequested;
     private readonly CancellationTokenSource _lifetimeCancellation = new();
     private Task? _startupTask;
     public override void Initialize()
@@ -50,7 +62,9 @@ public partial class App : Avalonia.Application
             _keyboardIdentity = new KeyboardDeviceIdentityService(new WindowsKeyboardDeviceMetadataProvider());
             var activeProfiles = new ActiveProfileService(ProfileCompiler.Compile(Phase2Defaults.CreateProfile()));
             var paths = new StoragePaths();
+            _paths = paths;
             var writer = new AtomicFileWriter();
+            _errorReports = new LocalErrorReportService(paths);
             var soundPackValidator = new SoundPackValidationService();
             _catalog = new SoundPackCatalogService(paths, soundPackValidator);
             _sampleCache = new SoundSampleCache(_catalog, new NAudioSoundDecoder());
@@ -76,14 +90,33 @@ public partial class App : Avalonia.Application
             _soundPacksPage = new SoundPacksViewModel(_catalog, soundPackValidator, _soundPackImport, settings, _preview, _sampleCache, soundPackPicker, soundPackConflicts, soundPackDependencies, new StorageCleanupService(paths));
             _profilesPage = new ProfilesPageViewModel(_profileManagement, settings, profileValidator, _catalog, _preview, _coordinator, picker);
             _keyboardsPage = new KeyboardsViewModel(_keyboardIdentity, _keyboardAssignments, settings, _preview);
-            var viewModel = new MainWindowViewModel(_coordinator, settings, _profilesPage, _audioPage, _keyboardsPage, _soundPacksPage);
+            _settingsPage = new SettingsViewModel(settings, new StartupRegistrationService(new RegistryStartupRegistrationStore()), new DiagnosticReportService(paths), paths);
+            var viewModel = new MainWindowViewModel(_coordinator, settings, _profilesPage, _audioPage, _keyboardsPage, _soundPacksPage, _settingsPage);
             _mainViewModel = viewModel;
             var mainWindow = new MainWindow { DataContext = viewModel };
             desktop.MainWindow = mainWindow;
-            desktop.Startup += (_, _) => _startupTask = StartApplicationAsync(viewModel);
+            _trayIcon = CreateTrayIcon(mainWindow, viewModel);
+            Program.SingleInstance?.StartActivationServer();
+            if (Program.SingleInstance is not null) Program.SingleInstance.ActivationRequested += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() => OpenMainWindow(mainWindow));
+            desktop.Startup += (_, _) =>
+            {
+                _startupTask = StartApplicationAsync(viewModel);
+                if (!settings.Settings.ShowWindowOnStartup) mainWindow.Hide();
+            };
+            mainWindow.PropertyChanged += (_, args) =>
+            {
+                if (args.Property.Name == nameof(Window.WindowState) && mainWindow.WindowState == WindowState.Minimized && settings.Settings.MinimizeToTray)
+                    mainWindow.Hide();
+            };
             mainWindow.Closing += async (_, args) =>
             {
                 if (_shutdownComplete) return;
+                if (!_exitRequested && settings.Settings.CloseToTray)
+                {
+                    args.Cancel = true;
+                    mainWindow.Hide();
+                    return;
+                }
                 args.Cancel = true;
                 try { await (_shutdownTask ??= ShutdownAndExitAsync(desktop, viewModel)); }
                 catch (Exception ex) { viewModel.ReportShutdownError(ex); }
@@ -98,6 +131,7 @@ public partial class App : Avalonia.Application
         try
         {
             _lifetimeCancellation.Cancel();
+            _trayIcon?.Dispose();
             if (_startupTask is not null) await _startupTask;
             if (_profilesPage is not null) await _profilesPage.DisposeAsync();
             if (_soundPacksPage is not null) await _soundPacksPage.DisposeAsync();
@@ -132,6 +166,58 @@ public partial class App : Avalonia.Application
     {
         try { await viewModel.StartAsync(_lifetimeCancellation.Token); }
         catch (OperationCanceledException) when (_lifetimeCancellation.IsCancellationRequested) { }
-        catch (Exception ex) { viewModel.ReportShutdownError(ex); }
+        catch (Exception ex) { viewModel.ReportShutdownError(ex); await WriteErrorReportAsync(ex, "Startup", "StartApplication"); }
     }
+
+    private TrayIcon CreateTrayIcon(Window window, MainWindowViewModel viewModel)
+    {
+        var open = new NativeMenuItem("Open KeySounds");
+        open.Click += (_, _) => OpenMainWindow(window);
+        var toggle = new NativeMenuItem();
+        toggle.Click += (_, _) => viewModel.IsEnabled = !viewModel.IsEnabled;
+        var active = new NativeMenuItem();
+        active.IsEnabled = false;
+        var soundPacks = new NativeMenuItem("Open Sound Packs");
+        soundPacks.Click += (_, _) => OpenMainWindow(window);
+        var diagnostics = new NativeMenuItem("Export Diagnostics");
+        diagnostics.Click += (_, _) => viewModel.SettingsPage?.ExportDiagnosticsCommand.Execute(null);
+        var exit = new NativeMenuItem("Exit");
+        exit.Click += (_, _) => RequestExit(window);
+        var menu = new NativeMenu { Items = { open, toggle, active, soundPacks, diagnostics, exit } };
+        menu.NeedsUpdate += (_, _) =>
+        {
+            toggle.Header = viewModel.IsEnabled ? "Sounds Enabled (click to disable)" : "Sounds Disabled (click to enable)";
+            active.Header = "Active Profile: " + (viewModel.SelectedProfile ?? "Fallback");
+        };
+        var icon = new TrayIcon { ToolTipText = "KeySounds", IsVisible = true, Menu = menu };
+        try { icon.Icon = new WindowIcon(new MemoryStream(TinyIcon)); } catch { }
+        icon.Clicked += (_, _) => OpenMainWindow(window);
+        return icon;
+    }
+
+    private void OpenMainWindow(Window window)
+    {
+        if (_shutdownComplete) return;
+        window.Show();
+        window.WindowState = WindowState.Normal;
+        window.ShowInTaskbar = true;
+        window.Activate();
+    }
+
+    private void RequestExit(Window window)
+    {
+        _exitRequested = true;
+        window.Close();
+    }
+
+    private async Task WriteErrorReportAsync(Exception exception, string category, string operation)
+    {
+        if (_errorReports is null || _settings is null) return;
+        try { await _errorReports.WriteAsync(exception, _settings.Settings, category, operation); } catch { }
+    }
+
+    private static readonly byte[] TinyIcon =
+    [
+        0,0,1,0,1,0,1,1,0,0,1,0,32,0,48,0,0,0,22,0,0,0,40,0,0,0,1,0,0,0,2,0,0,0,1,0,32,0,0,0,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    ];
 }

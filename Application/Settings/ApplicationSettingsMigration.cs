@@ -17,6 +17,18 @@ public static class ApplicationSettingsMigration
         {
             settings.KeyboardProfileAssignments = new(settings.KeyboardDeviceProfileAssignments, StringComparer.Ordinal); settings.SchemaVersion = 3; changed = true;
         }
+        if (settings.SchemaVersion < 4)
+        {
+            settings.MinimizeToTray = true;
+            settings.CloseToTray = true;
+            settings.ShowWindowOnStartup = true;
+            settings.EnableLocalCrashReports = true;
+            settings.DiagnosticReportRetentionDays = settings.DiagnosticReportRetentionDays is >= 1 and <= 365 ? settings.DiagnosticReportRetentionDays : 14;
+            settings.StartWithWindows = false;
+            settings.HasCompletedFirstRun = false;
+            settings.SchemaVersion = 4;
+            changed = true;
+        }
         return changed;
     }
 }

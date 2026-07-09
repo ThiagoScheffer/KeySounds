@@ -209,5 +209,40 @@
         <Border Background="#16000000" CornerRadius="6" Padding="12"><TextBlock TextWrapping="Wrap" Text="{Binding Message}"/></Border>
       </StackPanel></ScrollViewer>
     </TabItem>
+    <TabItem Header="Settings" DataContext="{Binding SettingsPage}">
+      <ScrollViewer><StackPanel x:DataType="vm:SettingsViewModel" Margin="24" Spacing="18" MaxWidth="760" HorizontalAlignment="Left">
+        <TextBlock FontSize="28" FontWeight="SemiBold" Text="Settings and About"/>
+        <Border Background="#16000000" CornerRadius="6" Padding="14">
+          <StackPanel Spacing="8">
+            <TextBlock FontSize="18" FontWeight="SemiBold" Text="First run"/>
+            <TextBlock TextWrapping="Wrap" Text="KeySounds runs locally. Keyboard events are processed transiently so sounds can play in the background; typed text and key sequences are not stored."/>
+            <CheckBox Content="Sounds enabled" IsChecked="{Binding SoundsEnabled}"/>
+            <CheckBox Content="Close to tray" IsChecked="{Binding CloseToTray}"/>
+            <CheckBox Content="Start with Windows (opt-in)" IsChecked="{Binding StartWithWindows}"/>
+            <Button Content="Complete first-run setup" Command="{Binding CompleteFirstRunCommand}"/>
+          </StackPanel>
+        </Border>
+        <Grid ColumnDefinitions="260,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="14">
+          <TextBlock Grid.Row="0" Text="Start with Windows"/><CheckBox Grid.Row="0" Grid.Column="1" IsChecked="{Binding StartWithWindows}"/>
+          <TextBlock Grid.Row="1" Text="Minimize to tray"/><CheckBox Grid.Row="1" Grid.Column="1" IsChecked="{Binding MinimizeToTray}"/>
+          <TextBlock Grid.Row="2" Text="Close to tray"/><CheckBox Grid.Row="2" Grid.Column="1" IsChecked="{Binding CloseToTray}"/>
+          <TextBlock Grid.Row="3" Text="Show window on startup"/><CheckBox Grid.Row="3" Grid.Column="1" IsChecked="{Binding ShowWindowOnStartup}"/>
+          <TextBlock Grid.Row="4" Text="Enable local crash reports"/><CheckBox Grid.Row="4" Grid.Column="1" IsChecked="{Binding EnableLocalCrashReports}"/>
+          <TextBlock Grid.Row="5" Text="First-run completed"/><TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding HasCompletedFirstRun}"/>
+        </Grid>
+        <StackPanel Spacing="8">
+          <TextBlock FontSize="18" FontWeight="SemiBold" Text="Diagnostics"/>
+          <TextBlock TextWrapping="Wrap" Text="Diagnostics export is local and sanitized. It contains aggregate state, counts, and runtime metadata; it does not include typed text, key sequences, raw device handles, or raw HID paths."/>
+          <Button Content="Export diagnostics" Command="{Binding ExportDiagnosticsCommand}"/>
+        </StackPanel>
+        <StackPanel Spacing="6">
+          <TextBlock FontSize="18" FontWeight="SemiBold" Text="About"/>
+          <TextBlock Text="{Binding Version, StringFormat='Version: {0}'}"/>
+          <TextBlock TextWrapping="Wrap" Text="{Binding AppDataPath, StringFormat='App data: {0}'}"/>
+          <TextBlock TextWrapping="Wrap" Text="{Binding PrivacySummary}"/>
+        </StackPanel>
+        <TextBlock Foreground="DarkGoldenrod" TextWrapping="Wrap" Text="{Binding Status}"/>
+      </StackPanel></ScrollViewer>
+    </TabItem>
   </TabControl>
 </Window>
