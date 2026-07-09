@@ -160,7 +160,7 @@ public sealed class ProfilesPageViewModel : ObservableObject, IAsyncDisposable
     public AsyncCommand SaveCommand { get; } public AsyncCommand SaveAndActivateCommand { get; } public AsyncCommand ActivateCommand { get; }
     public AsyncCommand ImportCommand { get; } public AsyncCommand ExportCommand { get; }
     private IEnumerable<AsyncCommand> Commands => [CreateCommand, DuplicateCommand, DeleteCommand, SaveCommand, SaveAndActivateCommand, ActivateCommand, ImportCommand, ExportCommand];
-    private AsyncCommand Command(Func<Task> action, Func<bool>? can = null) => new(async () => { if (_shutdown) return; Status = null; await action(); Raise(nameof(IsBusy)); }, can, ex => Status = ex.Message);
+    private AsyncCommand Command(Func<Task> action, Func<bool>? can = null) => new(async () => { if (_shutdown) return; Status = null; await action(); Raise(nameof(IsBusy)); }, can, _ => Status = "Operation failed. Check the profile and try again.");
     public Task InitializeAsync() { RefreshItems(); return Task.CompletedTask; }
     public void RefreshFromServices() => RefreshItems();
     private void RefreshItems(string? selectId = null)
@@ -178,7 +178,7 @@ public sealed class ProfilesPageViewModel : ObservableObject, IAsyncDisposable
     private async Task DuplicateAsync() { if (Selected is null) return; Complete(await _management.DuplicateAsync(Selected.Profile)); }
     private async Task DeleteAsync() { if (Selected is null) return; var deleted = Selected.Id; var result = await _management.DeleteAsync(Selected.Profile); Complete(result, result.Success ? null : deleted); }
     private async Task SaveAsync(bool activate) { if (Editor is null) return; var result = await _management.SaveAsync(Editor.Session, activate); if (result.Success && result.Profile is not null) Editor.AcceptSaved(result.Profile); Complete(result); }
-    private async Task ActivateAsync() { if (Selected is null) return; try { await _settings.ActivateAsync(Selected.Id); RefreshItems(Selected.Id); Status = "Profile activated."; } catch (Exception ex) { Status = ex.Message; } }
+    private async Task ActivateAsync() { if (Selected is null) return; try { await _settings.ActivateAsync(Selected.Id); RefreshItems(Selected.Id); Status = "Profile activated."; } catch (InvalidOperationException ex) { Status = ex.Message; } catch { Status = "The profile could not be activated."; } }
     private async Task ImportAsync() { var path = await _picker.PickImportAsync(); if (path is null) return; Complete(await _management.ImportAsync(path, ProfileImportConflictPolicy.ImportAsCopy)); }
     private async Task ExportAsync() { if (Selected is null) return; var path = await _picker.PickExportAsync(Selected.Id); if (path is null) return; Complete(await _management.ExportAsync(Selected.Profile, path)); }
     private void Complete(ProfileOperationResult result, string? selectId = null) { Status = result.Success ? "Operation completed." : result.Message; if (result.Success) RefreshItems(result.Profile?.Id ?? selectId); RefreshCommands(); }

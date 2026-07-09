@@ -42,6 +42,7 @@ public sealed class ProfileValidationService(SoundPackCatalogService catalog)
         if (string.IsNullOrWhiteSpace(profile.Name) || profile.Name.Length > 128) issues.Add(Error("InvalidName", "Profile name is required and must not exceed 128 characters.", "name"));
         if (profile.MasterVolume is < 0 or > 1) issues.Add(Error("InvalidMasterVolume", "Master volume must be between 0 and 1.", "masterVolume"));
         if (profile.RepeatMinimumIntervalMilliseconds is < 20 or > 2000) issues.Add(Error("InvalidRepeatInterval", "Repeat interval must be between 20 and 2000 ms.", "repeatMinimumIntervalMilliseconds"));
+        if (!HasAudibleRoute(profile)) issues.Add(Error("NoAudibleMappings", "Enable key-down playback or assign at least one key-up sound set.", "playback"));
         foreach (var pair in profile.Groups)
         {
             var path = $"groups.{pair.Key}"; var mapping = pair.Value;
@@ -60,6 +61,22 @@ public sealed class ProfileValidationService(SoundPackCatalogService catalog)
             if (value.SoundPackId is not null && value.KeyDownSoundSetId is not null) ValidateReference(value.SoundPackId, value.KeyDownSoundSetId, path + ".keyDownSoundSetId", issues, true);
         }
         return issues;
+    }
+
+    private static bool HasAudibleRoute(SoundProfile profile)
+    {
+        if (!profile.Enabled) return false;
+        foreach (var mapping in profile.Groups.Values.Where(mapping => mapping.Enabled))
+        {
+            if (profile.PlayOnKeyDown && !string.IsNullOrWhiteSpace(mapping.KeyDownSoundSetId)) return true;
+            if (profile.PlayOnKeyUp && !string.IsNullOrWhiteSpace(mapping.KeyUpSoundSetId)) return true;
+        }
+        foreach (var value in profile.KeyOverrides.Values.Where(value => value.Enabled))
+        {
+            if (profile.PlayOnKeyDown && !string.IsNullOrWhiteSpace(value.KeyDownSoundSetId)) return true;
+            if (profile.PlayOnKeyUp && !string.IsNullOrWhiteSpace(value.KeyUpSoundSetId)) return true;
+        }
+        return false;
     }
 
     private void ValidateReference(string? packId, string? setId, string path, List<ProfileValidationIssue> issues, bool required)

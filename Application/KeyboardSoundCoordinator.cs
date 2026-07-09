@@ -32,7 +32,18 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
     public string AudioStatus { get; private set; } = "Stopped";
     public string? ErrorMessage { get; private set; }
     private long _clickCount;
+    private long _inputEventCount;
+    private long _routedTriggerCount;
+    private long _routeMissCount;
+    private long _disabledDropCount;
+    private long _audioUnavailableDropCount;
     public long ClickCount => Interlocked.Read(ref _clickCount);
+    public long InputEventCount => Interlocked.Read(ref _inputEventCount);
+    public long RoutedTriggerCount => Interlocked.Read(ref _routedTriggerCount);
+    public long RouteMissCount => Interlocked.Read(ref _routeMissCount);
+    public long DisabledDropCount => Interlocked.Read(ref _disabledDropCount);
+    public long AudioUnavailableDropCount => Interlocked.Read(ref _audioUnavailableDropCount);
+    public string TriggerDiagnostics => $"input {InputEventCount}, routed {RoutedTriggerCount}, no route {RouteMissCount}, disabled {DisabledDropCount}, audio unavailable {AudioUnavailableDropCount}";
     public event EventHandler? StatusChanged;
 
     public Task StartAsync(CancellationToken token = default)
@@ -48,7 +59,7 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
     {
         _cts = new CancellationTokenSource();
         try { AudioStatus = "Starting"; Changed(); await _audio.InitializeAsync(_cts.Token); AudioStatus = _audio.IsInitialized ? "Active" : "Device error"; if (!_audio.IsInitialized) ErrorMessage = "No usable audio output is currently available."; }
-        catch (Exception ex) { AudioStatus = ex is FileNotFoundException ? "Missing sample" : "Device error"; ErrorMessage = ex.Message; }
+        catch (Exception ex) { AudioStatus = ex is FileNotFoundException ? "Missing sample" : "Device error"; ErrorMessage = "Audio could not start."; }
         try
         {
             _cts.Token.ThrowIfCancellationRequested();
@@ -61,12 +72,13 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
             InputStatus = "Active";
         }
         catch (OperationCanceledException) when (_cts.IsCancellationRequested) { InputStatus = "Stopped"; }
-        catch (Exception ex) { InputStatus = "Error"; ErrorMessage = ex.Message; }
+        catch { InputStatus = "Error"; ErrorMessage = "Keyboard input could not start."; }
         Changed();
     }
 
     private void OnInput(object? sender, KeyboardInputEvent value)
     {
+        Interlocked.Increment(ref _inputEventCount);
         _identity?.RequestResolution(value.DeviceHandle);
         var capture = Volatile.Read(ref _capture);
         if (capture is not null && value.Action == KeyboardAction.KeyDown && capture.TrySetResult(new(value.ScanCode, value.IsExtended)))
@@ -96,8 +108,10 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
             await foreach (var value in _events.Reader.ReadAllAsync(token))
             {
                 var trigger = _router.Route(value);
-                if (!IsEnabled || !_audio.IsInitialized || trigger is null) continue;
-                _audio.Play(trigger.Value); Interlocked.Increment(ref _clickCount);
+                if (trigger is null) { Interlocked.Increment(ref _routeMissCount); continue; }
+                if (!IsEnabled) { Interlocked.Increment(ref _disabledDropCount); continue; }
+                if (!_audio.IsInitialized) { Interlocked.Increment(ref _audioUnavailableDropCount); continue; }
+                _audio.Play(trigger.Value); Interlocked.Increment(ref _routedTriggerCount); Interlocked.Increment(ref _clickCount);
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }

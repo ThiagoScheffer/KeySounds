@@ -30,7 +30,7 @@ public sealed class AudioSettingsViewModel : ObservableObject, IAsyncDisposable
     public string? Message { get => _message ?? Status.ErrorMessage; private set => Set(ref _message, value); }
     public AsyncCommand RefreshCommand { get; } public AsyncCommand ApplyCommand { get; } public AsyncCommand RetryCommand { get; } public AsyncCommand UseDefaultCommand { get; } public AsyncCommand TestSoundCommand { get; }
     private IEnumerable<AsyncCommand> Commands => [RefreshCommand, ApplyCommand, RetryCommand, UseDefaultCommand, TestSoundCommand];
-    private AsyncCommand Command(Func<Task> action, Func<bool>? can = null) => new(async () => { if (_shutdown) return; Message = null; await action(); }, can, ex => Message = ex.Message);
+    private AsyncCommand Command(Func<Task> action, Func<bool>? can = null) => new(async () => { if (_shutdown) return; Message = null; await action(); }, can, _ => Message = "Audio operation failed. Refresh devices and try again.");
     public async Task InitializeAsync() { SelectedLatency = Status.LatencyMilliseconds; await RefreshAsync(); SelectConfigured(); }
     private async Task RefreshAsync()
     {

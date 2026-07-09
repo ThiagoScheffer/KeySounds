@@ -18,7 +18,10 @@ public sealed class AvaloniaSoundPackConflictResolver(Func<Window?> owner) : ISo
 {
     public async Task<SoundPackConflictPolicy> ResolveDuplicateAsync(InstalledSoundPack existing, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         if (existing.IsBuiltIn) return SoundPackConflictPolicy.Cancel;
+        var parent = owner();
+        if (parent is null) return SoundPackConflictPolicy.Cancel;
         var dialog = new Window
         {
             Width = 460,
@@ -43,9 +46,7 @@ public sealed class AvaloniaSoundPackConflictResolver(Func<Window?> owner) : ISo
                 new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { cancel, replace } }
             }
         };
-        var parent = owner();
-        if (parent is null) dialog.Show();
-        else await dialog.ShowDialog(parent);
+        await dialog.ShowDialog(parent);
         token.ThrowIfCancellationRequested();
         return result;
     }

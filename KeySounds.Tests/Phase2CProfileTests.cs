@@ -69,6 +69,18 @@ public sealed class Phase2CProfileTests
     }
 
     [Fact]
+    public async Task ValidationRejectsProfileWithNoAudibleRoutes()
+    {
+        await using var fixture = await ProfileFixture.CreateAsync(); var profile = Phase2Defaults.CreateProfile();
+        profile.PlayOnKeyDown = false; profile.PlayOnKeyUp = true;
+        foreach (var mapping in profile.Groups.Values) mapping.KeyUpSoundSetId = null;
+
+        var issues = fixture.Validator.Validate(profile);
+
+        Assert.Contains(issues, issue => issue.Code == "NoAudibleMappings");
+    }
+
+    [Fact]
     public async Task ImportAsCopyAndExportRoundTripWithoutRuntimeState()
     {
         await using var fixture = await ProfileFixture.CreateAsync(); var fallback = fixture.Settings.Profiles.Single(profile => profile.Id == "default");

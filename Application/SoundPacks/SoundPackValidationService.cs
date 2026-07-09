@@ -26,7 +26,7 @@ public sealed class SoundPackValidationService(SoundPackValidationOptions? optio
         if (!File.Exists(manifestPath)) return Invalid("ManifestMissing", "manifest.json is missing.");
         SoundPackManifest? manifest;
         try { await using var stream = File.OpenRead(manifestPath); manifest = await JsonSerializer.DeserializeAsync<SoundPackManifest>(stream, JsonOptions, token); }
-        catch (Exception ex) when (ex is JsonException or IOException) { return Invalid("ManifestMalformed", "manifest.json is not readable JSON."); }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException) { return Invalid("ManifestMalformed", "manifest.json is not readable JSON."); }
         if (manifest is null) return Invalid("ManifestMalformed", "manifest.json is empty.");
         if (manifest.SchemaVersion != 1) issues.Add(new("UnsupportedSchema", "Only sound-pack schema version 1 is supported."));
         if (string.IsNullOrWhiteSpace(manifest.Id) || !SafeId.IsMatch(manifest.Id)) issues.Add(new("InvalidPackId", "Pack ID must use lowercase letters, numbers, hyphens, or underscores."));

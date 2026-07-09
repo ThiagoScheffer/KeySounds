@@ -37,7 +37,7 @@ public sealed class KeyboardProfileAssignmentService : IDeviceProfileResolver, I
             var previousRuntime = Volatile.Read(ref _runtime); var nextRuntime = new Dictionary<KeyboardDeviceId, PreparedProfileSnapshot>(previousRuntime) { [id] = new(profileId, compiled, required.ToHashSet()) }; Volatile.Write(ref _runtime, nextRuntime);
             var assignments = new Dictionary<string, string>(_settings.Settings.KeyboardProfileAssignments, StringComparer.Ordinal) { [id.Value] = profileId };
             try { await _settings.SaveKeyboardAssignmentsAsync(assignments, token); }
-            catch (Exception ex) { Volatile.Write(ref _runtime, previousRuntime); return new(false, "PersistenceFailed", ex.Message); }
+            catch { Volatile.Write(ref _runtime, previousRuntime); return new(false, "PersistenceFailed", "The assignment could not be saved."); }
             await ReleaseUnusedAsync(token); Changed?.Invoke(this, EventArgs.Empty); return new(true);
         }
         finally { _gate.Release(); }
@@ -50,7 +50,7 @@ public sealed class KeyboardProfileAssignmentService : IDeviceProfileResolver, I
             if (_shutdown) return new(false, "Shutdown", "Keyboard assignments are shutting down.");
             var oldRuntime = Volatile.Read(ref _runtime); var next = new Dictionary<KeyboardDeviceId, PreparedProfileSnapshot>(oldRuntime); next.Remove(id); Volatile.Write(ref _runtime, next);
             var assignments = new Dictionary<string, string>(_settings.Settings.KeyboardProfileAssignments, StringComparer.Ordinal); assignments.Remove(id.Value);
-            try { await _settings.SaveKeyboardAssignmentsAsync(assignments, token); } catch (Exception ex) { Volatile.Write(ref _runtime, oldRuntime); return new(false, "PersistenceFailed", ex.Message); }
+            try { await _settings.SaveKeyboardAssignmentsAsync(assignments, token); } catch { Volatile.Write(ref _runtime, oldRuntime); return new(false, "PersistenceFailed", "The assignment could not be saved."); }
             await ReleaseUnusedAsync(token); Changed?.Invoke(this, EventArgs.Empty); return new(true);
         }
         finally { _gate.Release(); }

@@ -41,7 +41,7 @@ public sealed class SoundPackImportService(StoragePaths paths, SoundPackValidati
             await catalog.RefreshAsync(token);
             return new(true, manifest.Id);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException) { return new(false, ErrorCode: "ImportFailed", Message: ex.Message); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { return new(false, ErrorCode: "ImportFailed", Message: "The sound pack could not be imported."); }
         finally
         {
             if (temporary is not null && Directory.Exists(temporary)) Directory.Delete(temporary, true);
@@ -64,7 +64,7 @@ public sealed class SoundPackImportService(StoragePaths paths, SoundPackValidati
             if (cache is not null) await cache.RemovePackAsync(packId, token);
             await catalog.RefreshAsync(token); return new(true, null, null, []);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException) { return new(false, "RemovalFailed", ex.Message, []); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { return new(false, "RemovalFailed", "The sound pack could not be removed.", []); }
         finally { _gate.Release(); }
     }
 

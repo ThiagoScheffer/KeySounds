@@ -153,6 +153,7 @@ public sealed class SoundPacksViewModel : ObservableObject, IAsyncDisposable
     private readonly ISoundPackConflictResolver _conflicts;
     private readonly SoundPackDependencyService _dependencies;
     private readonly StorageCleanupService _cleanup;
+    private readonly CancellationTokenSource _lifetime = new();
     private SoundPackRowViewModel? _selected;
     private OperationStatus? _status;
     private bool _shutdown;
@@ -190,7 +191,7 @@ public sealed class SoundPacksViewModel : ObservableObject, IAsyncDisposable
     public AsyncCommand RemoveCommand { get; }
     public AsyncCommand CleanupCommand { get; }
     private IEnumerable<AsyncCommand> Commands => [RefreshCommand, ImportCommand, RemoveCommand, CleanupCommand];
-    private AsyncCommand Command(Func<Task> action, Func<bool>? can = null) => new(async () => { if (_shutdown) return; Status = null; await action(); RaiseBusyAndSummary(); }, can, ex => Status = OperationStatus.Error("OperationFailed", "Operation failed.", ex.Message));
+    private AsyncCommand Command(Func<Task> action, Func<bool>? can = null) => new(async () => { if (_shutdown) return; Status = null; await action(); RaiseBusyAndSummary(); }, can, _ => Status = OperationStatus.Error("OperationFailed", "Operation failed. Check the selected item and try again."));
 
     public async Task InitializeAsync(CancellationToken token = default) => await RefreshAsync(token);
 
@@ -203,9 +204,11 @@ public sealed class SoundPacksViewModel : ObservableObject, IAsyncDisposable
 
     private async Task ImportAsync()
     {
-        var folder = await _picker.PickImportFolderAsync();
+        var token = _lifetime.Token;
+        var folder = await _picker.PickImportFolderAsync(token);
+        if (_shutdown) return;
         if (string.IsNullOrWhiteSpace(folder)) { Status = OperationStatus.Info("ImportCanceled", "Sound-pack import canceled."); return; }
-        var validation = await _validator.ValidateAsync(folder);
+        var validation = await _validator.ValidateAsync(folder, token);
         if (!validation.IsValid || validation.Manifest is null)
         {
             Status = OperationStatus.Error(validation.Issues.FirstOrDefault()?.Code ?? "ValidationFailed", "Sound-pack validation failed.", string.Join(Environment.NewLine, validation.Issues.Select(issue => issue.Message)));
@@ -220,19 +223,20 @@ public sealed class SoundPacksViewModel : ObservableObject, IAsyncDisposable
                 Status = OperationStatus.Error("BuiltInProtected", "The built-in sound pack cannot be replaced.");
                 return;
             }
-            policy = await _conflicts.ResolveDuplicateAsync(existing);
+            policy = await _conflicts.ResolveDuplicateAsync(existing, token);
+            if (_shutdown) return;
             if (policy == SoundPackConflictPolicy.Cancel) { Status = OperationStatus.Info("ImportCanceled", "Sound-pack replacement canceled."); return; }
         }
 
-        var result = await _importer.ImportFolderAsync(folder, policy);
+        var result = await _importer.ImportFolderAsync(folder, policy, token);
         if (!result.Success)
         {
             Status = OperationStatus.Error(result.ErrorCode ?? "ImportFailed", result.Message ?? "Sound-pack import failed.");
-            await RefreshAsync();
+            await RefreshAsync(token);
             return;
         }
 
-        await _settings.ReloadProfilesAsync();
+        await _settings.ReloadProfilesAsync(token);
         Rebuild(result.PackId);
         Status = OperationStatus.Info("ImportCompleted", "Sound pack imported.");
     }
@@ -248,11 +252,12 @@ public sealed class SoundPacksViewModel : ObservableObject, IAsyncDisposable
             return;
         }
         var currentIndex = Packs.IndexOf(pack);
-        var result = await _importer.RemoveAsync(pack.Pack.Manifest.Id);
+        var token = _lifetime.Token;
+        var result = await _importer.RemoveAsync(pack.Pack.Manifest.Id, token);
         if (!result.Success)
         {
             Status = OperationStatus.Warning(result.ErrorCode ?? "RemovalBlocked", result.Message ?? "Sound-pack removal failed.", string.Join(", ", result.ReferencingProfileIds));
-            await RefreshAsync();
+            await RefreshAsync(token);
             return;
         }
         Rebuild(Packs.ElementAtOrDefault(Math.Max(0, currentIndex - 1))?.Id);
@@ -261,8 +266,9 @@ public sealed class SoundPacksViewModel : ObservableObject, IAsyncDisposable
 
     private async Task CleanupAsync()
     {
-        var result = await _cleanup.CleanupAsync();
-        await RefreshAsync();
+        var token = _lifetime.Token;
+        var result = await _cleanup.CleanupAsync(token);
+        await RefreshAsync(token);
         Status = OperationStatus.Info("CleanupCompleted", "Storage cleanup completed.", result.ToString());
     }
 
@@ -309,7 +315,9 @@ public sealed class SoundPacksViewModel : ObservableObject, IAsyncDisposable
     public ValueTask DisposeAsync()
     {
         _shutdown = true;
+        _lifetime.Cancel();
         _settings.Changed -= OnExternalChanged;
+        _lifetime.Dispose();
         return ValueTask.CompletedTask;
     }
 }

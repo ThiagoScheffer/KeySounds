@@ -24,11 +24,11 @@ public sealed class AudioDeviceSelectionService(IAudioOutputDeviceService device
             if (result.Success)
             {
                 try { await settings.SaveAudioConfigurationAsync(selection, latency, token); }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     var rollback = await engine.SwitchOutputAsync(previous.ConfiguredSelection, previous.LatencyMilliseconds, token);
                     result = new(false, selection, engine.Status.EffectiveDeviceId, engine.Status.EffectiveDeviceName, engine.Status.IsFallbackActive,
-                        rollback.Success ? "SettingsPersistenceFailed" : "RollbackFailed", rollback.Success ? $"The preference could not be saved; the previous output was restored. {ex.Message}" : "The preference could not be saved and output rollback failed.");
+                        rollback.Success ? "SettingsPersistenceFailed" : "RollbackFailed", rollback.Success ? "The preference could not be saved; the previous output was restored." : "The preference could not be saved and output rollback failed.");
                 }
             }
             Changed?.Invoke(this, EventArgs.Empty); return result;

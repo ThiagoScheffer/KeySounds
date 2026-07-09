@@ -16,7 +16,7 @@ public sealed class AsyncCommand(Func<Task> execute, Func<bool>? canExecute = nu
     private bool _running;
     public bool IsRunning { get => _running; private set { if (Set(ref _running, value)) CanExecuteChanged?.Invoke(this, EventArgs.Empty); } }
     public bool CanExecute(object? parameter) => !IsRunning && (canExecute?.Invoke() ?? true);
-    public async void Execute(object? parameter) { if (!CanExecute(parameter)) return; IsRunning = true; try { await execute(); } catch (Exception ex) { onError?.Invoke(ex); } finally { IsRunning = false; CanExecuteChanged?.Invoke(this, EventArgs.Empty); } }
+    public async void Execute(object? parameter) { if (!CanExecute(parameter)) return; IsRunning = true; try { await execute(); } catch (OperationCanceledException) { } catch (Exception ex) { onError?.Invoke(ex); } finally { IsRunning = false; CanExecuteChanged?.Invoke(this, EventArgs.Empty); } }
     public event EventHandler? CanExecuteChanged;
     public void Refresh() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
 }

@@ -12,15 +12,16 @@
           <TextBlock Grid.Row="0" VerticalAlignment="Center" Text="Active profile"/><ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}"/>
           <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="Global volume"/><Slider Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding GlobalVolume}" TickFrequency="0.05"/>
         </Grid>
-        <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
+        <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
           <TextBlock Grid.Row="0" Text="Input" FontWeight="SemiBold"/><TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding InputStatus}"/>
           <TextBlock Grid.Row="1" Text="Audio" FontWeight="SemiBold"/><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding AudioStatus}"/>
           <TextBlock Grid.Row="2" Text="Sound packs" FontWeight="SemiBold"/><TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SoundPackStatus}"/>
           <TextBlock Grid.Row="3" Text="Sample cache" FontWeight="SemiBold"/><TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SampleCacheStatus}"/>
           <TextBlock Grid.Row="4" Text="Triggers" FontWeight="SemiBold"/><TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding ClickCount}"/>
-          <TextBlock Grid.Row="5" Text="Keyboards" FontWeight="SemiBold"/><TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding KeyboardSummary}"/>
-          <TextBlock Grid.Row="6" Text="Output" FontWeight="SemiBold"/><TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding AudioPage.EffectiveOutput}"/>
-          <TextBlock Grid.Row="7" Text="Recent status" FontWeight="SemiBold"/><TextBlock Grid.Row="7" Grid.Column="1" TextWrapping="Wrap" Text="{Binding RecentWarning}"/>
+          <TextBlock Grid.Row="5" Text="Keyboard path" FontWeight="SemiBold"/><TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding TriggerDiagnostics}"/>
+          <TextBlock Grid.Row="6" Text="Keyboards" FontWeight="SemiBold"/><TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding KeyboardSummary}"/>
+          <TextBlock Grid.Row="7" Text="Output" FontWeight="SemiBold"/><TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding AudioPage.EffectiveOutput}"/>
+          <TextBlock Grid.Row="8" Text="Recent status" FontWeight="SemiBold"/><TextBlock Grid.Row="8" Grid.Column="1" TextWrapping="Wrap" Text="{Binding RecentWarning}"/>
         </Grid>
         <TextBlock Text="{Binding ProfilesPage.ProfileCount, StringFormat='Saved profiles: {0}'}"/>
         <TextBlock Text="{Binding ProfilesPage.IsDirty, StringFormat='Editor has unsaved changes: {0}'}"/>

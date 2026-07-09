@@ -15,7 +15,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         _coordinator = coordinator; _settings = settings; ProfilesPage = profilesPage; AudioPage = audioPage; KeyboardsPage = keyboardsPage; SoundPacksPage = soundPacksPage; coordinator.StatusChanged += OnChanged;
         if (_settings is not null) _settings.Changed += OnSettingsChanged;
-        _counterTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (_, _) => Raise(nameof(ClickCount)));
+        _counterTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (_, _) => { Raise(nameof(ClickCount)); Raise(nameof(TriggerDiagnostics)); });
     }
     public ProfilesPageViewModel? ProfilesPage { get; }
     public AudioSettingsViewModel? AudioPage { get; }
@@ -25,6 +25,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public string InputStatus => _coordinator.InputStatus;
     public string AudioStatus => _coordinator.AudioStatus;
     public long ClickCount => _coordinator.ClickCount;
+    public string TriggerDiagnostics => _coordinator.TriggerDiagnostics;
     public string? ErrorMessage => _shutdownError ?? _coordinator.ErrorMessage;
     public IReadOnlyList<string> Profiles => _settings?.Profiles.Select(profile => profile.Name).ToList() ?? [];
     public string? SelectedProfile
@@ -82,6 +83,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private async void Persist(Func<Task?> operation)
     {
         try { var task = operation(); if (task is not null) await task; }
-        catch (Exception ex) { _shutdownError = ex.Message; Raise(nameof(ErrorMessage)); }
+        catch { _shutdownError = "The setting could not be saved."; Raise(nameof(ErrorMessage)); }
     }
 }

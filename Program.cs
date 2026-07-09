@@ -1,4 +1,6 @@
-﻿using Avalonia;
+using Avalonia;
+using KeySounds.Application.Diagnostics;
+using KeySounds.Infrastructure.Persistence;
 using System;
 
 namespace KeySounds;
@@ -9,8 +11,11 @@ class Program
     // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
     // yet and stuff might break.
     [STAThread]
-    public static void Main(string[] args) => BuildAvaloniaApp()
-        .StartWithClassicDesktopLifetime(args);
+    public static void Main(string[] args)
+    {
+        if (TryRunDiagnostics(args)) return;
+        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    }
 
     // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()
@@ -21,4 +26,11 @@ class Program
 #endif
             .WithInterFont()
             .LogToTrace();
+
+    private static bool TryRunDiagnostics(string[] args)
+    {
+        if (args.Length < 2 || !string.Equals(args[0], "--diagnostics", StringComparison.OrdinalIgnoreCase)) return false;
+        new DiagnosticReportService(new StoragePaths()).ExportAsync(args[1]).GetAwaiter().GetResult();
+        return true;
+    }
 }

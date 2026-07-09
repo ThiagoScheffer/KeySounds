@@ -76,7 +76,7 @@ public sealed class ProfileManagementService(JsonProfileRepository repository, P
     {
         await _gate.WaitAsync(token);
         try { if (_shutdown) return new(false, "Shutdown", "Profile operations are shutting down."); return await operation(); }
-        catch (Exception ex) when (ex is not OperationCanceledException) { return new(false, "OperationFailed", ex.Message); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { return new(false, "OperationFailed", "The profile operation could not be completed."); }
         finally { _gate.Release(); }
     }
     private string GenerateId(string name)
