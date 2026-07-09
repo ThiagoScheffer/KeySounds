@@ -1,12 +1,20 @@
-# KeySounds Phase 2 release-candidate checklist
+# KeySounds Phase 3 release-candidate checklist
 
 ## Build and automated tests
 
 - Build: `dotnet build KeySounds.csproj -c Release`
 - Tests: `dotnet test KeySounds.Tests\KeySounds.Tests.csproj -c Release`
-- Diagnostic export: `KeySounds.exe --diagnostics diagnostics.json`
-- Portable publish: `dotnet publish KeySounds.csproj -c Release -r win-x64 --self-contained true -o artifacts/portable/win-x64`
+- Diagnostics export: Settings → Export diagnostics, or tray menu → Export Diagnostics.
+- Portable publish: `dotnet publish KeySounds.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\publish\win-x64-portable`
+- Helper script: `.\scripts\publish-portable.ps1`
 - Expected result: zero build warnings/errors, all tests passing, and a sanitized diagnostic JSON report with aggregate counts only.
+
+## Phase 3 verification status
+
+- Automated Release build and test verification is required for every pass.
+- Portable publish must be run before tagging an RC; record output size and executable path in the release notes.
+- GUI/tray behavior requires an interactive Windows desktop and is not considered verified by headless CI alone.
+- Registry startup behavior must be checked on the target Windows user account and the `KeySounds` Run value must be removed again if this is only a test.
 
 ## Phase 3 distribution checks
 
@@ -20,6 +28,34 @@
 - Diagnostics export from Settings is sanitized.
 - Local error reports are created only when enabled and retained according to settings.
 - Published portable folder runs without test assemblies.
+
+## Manual tray verification steps
+
+1. Start `KeySounds.exe`.
+2. Confirm the tray icon appears and tooltip says `KeySounds`.
+3. Open the tray menu.
+4. Use Open KeySounds and confirm the main window shows/focuses.
+5. Toggle Sounds Enabled/Disabled and confirm Dashboard reflects the same state.
+6. Confirm Active Profile displays the current active profile name.
+7. Use Open Sound Packs and confirm the Sound Packs tab is selected.
+8. Use Export Diagnostics and confirm a JSON file appears under `%LocalAppData%\KeySounds\diagnostics`.
+9. Use Exit and confirm the process exits.
+
+## Manual close/minimize verification steps
+
+1. Enable Close to tray, close the window, and confirm the process remains running.
+2. Restore from tray and confirm keyboard sounds still work.
+3. Disable Close to tray, close the window, and confirm the process exits.
+4. Enable Minimize to tray, minimize the window, and confirm it hides.
+5. Disable Minimize to tray and confirm normal minimize behavior.
+
+## Manual startup verification steps
+
+1. Enable Start with Windows.
+2. Confirm `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\KeySounds` is written.
+3. Confirm the value quotes the current executable path and includes `--startup`.
+4. Disable Start with Windows and confirm the value is removed.
+5. Launch `KeySounds.exe --startup` and confirm startup visibility follows Settings → Show window on startup.
 
 ## Clean app-data test
 

@@ -11,6 +11,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly KeyboardSoundCoordinator _coordinator;
     private readonly Phase2SettingsService? _settings;
     private readonly DispatcherTimer _counterTimer;
+    private int _selectedTabIndex;
     public MainWindowViewModel(KeyboardSoundCoordinator coordinator, Phase2SettingsService? settings = null, ProfilesPageViewModel? profilesPage = null, AudioSettingsViewModel? audioPage = null, KeyboardsViewModel? keyboardsPage = null, SoundPacksViewModel? soundPacksPage = null, SettingsViewModel? settingsPage = null)
     {
         _coordinator = coordinator; _settings = settings; ProfilesPage = profilesPage; AudioPage = audioPage; KeyboardsPage = keyboardsPage; SoundPacksPage = soundPacksPage; SettingsPage = settingsPage; coordinator.StatusChanged += OnChanged;
@@ -22,6 +23,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public KeyboardsViewModel? KeyboardsPage { get; }
     public SoundPacksViewModel? SoundPacksPage { get; }
     public SettingsViewModel? SettingsPage { get; }
+    public int SelectedTabIndex { get => _selectedTabIndex; set { if (_selectedTabIndex == value) return; _selectedTabIndex = value; Raise(); } }
     public bool IsEnabled { get => _coordinator.IsEnabled; set { _coordinator.IsEnabled = value; Raise(); Persist(() => _settings?.SetEnabledAsync(value)); } }
     public string InputStatus => _coordinator.InputStatus;
     public string AudioStatus => _coordinator.AudioStatus;
@@ -61,6 +63,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         if (AudioPage is not null) await AudioPage.InitializeAsync();
         if (KeyboardsPage is not null) await KeyboardsPage.InitializeAsync(token);
         if (SoundPacksPage is not null) await SoundPacksPage.InitializeAsync(token);
+        if (_settings?.Settings.HasCompletedFirstRun == false) SelectedTabIndex = 5;
         _counterTimer.Start();
         Raise(nameof(Profiles)); Raise(nameof(SelectedProfile)); Raise(nameof(GlobalVolume)); Raise(nameof(IsEnabled)); Raise(nameof(SettingsStatus)); Raise(nameof(SoundPackStatus)); Raise(nameof(SampleCacheStatus));
         Raise(nameof(ProfilesPage));

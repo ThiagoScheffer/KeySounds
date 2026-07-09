@@ -4,11 +4,25 @@
 
 Recommended portable folder publish:
 
-```bash
-dotnet publish KeySounds.csproj -c Release -r win-x64 --self-contained true -o artifacts/portable/win-x64
+```powershell
+dotnet publish KeySounds.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\publish\win-x64-portable
+```
+
+Helper script:
+
+```powershell
+.\scripts\publish-portable.ps1
+```
+
+Expected executable:
+
+```text
+artifacts\publish\win-x64-portable\KeySounds.exe
 ```
 
 Folder deployment is preferred for the current Avalonia/NAudio asset layout. Validate single-file separately before using it for release.
+
+No installer is currently provided. The portable folder is the release artifact until WiX, Inno Setup, MSIX, or another installer path is added. The Phase 3 review publish measured 206.01 MiB / 216,018,885 bytes across 230 files. Re-measure the folder size for each release candidate because runtime and dependency changes can move it.
 
 ## Installer-ready build
 
@@ -23,6 +37,14 @@ Installer expectations:
 - the fallback sound pack is materialized into app data on first run
 - custom user sound packs remain in app data
 
+## App data and diagnostics
+
+Runtime data is stored under `%LocalAppData%\KeySounds`.
+
+Diagnostics exports are written by default under `%LocalAppData%\KeySounds\diagnostics`.
+
+Local error reports, when enabled, are written under `%LocalAppData%\KeySounds\reports`.
+
 ## Start with Windows
 
 The app uses the per-user Run key:
@@ -32,6 +54,12 @@ HKCU\Software\Microsoft\Windows\CurrentVersion\Run
 ```
 
 The value points to the current executable path with quotes and `--startup`. No admin rights are required.
+
+Example value:
+
+```text
+"C:\Path\To\KeySounds.exe" --startup
+```
 
 ## Code signing placeholder
 
@@ -49,3 +77,10 @@ App data is migrated in place. Back up `%LocalAppData%\KeySounds` before release
 ## Uninstall considerations
 
 The uninstaller may remove program files. User data under `%LocalAppData%\KeySounds` should be optional to remove and clearly disclosed.
+
+For a manual portable uninstall:
+
+1. Exit KeySounds from the tray menu.
+2. Delete the portable publish folder.
+3. Optionally delete `%LocalAppData%\KeySounds`.
+4. If Start with Windows was enabled, remove the `KeySounds` value from `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.

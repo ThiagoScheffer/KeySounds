@@ -4,6 +4,7 @@ using KeySounds.Application.SystemIntegration;
 using KeySounds.Core.Audio;
 using KeySounds.Core.Settings;
 using KeySounds.Infrastructure.Persistence;
+using System.Text.Json;
 using Xunit;
 
 namespace KeySounds.Tests;
@@ -70,6 +71,87 @@ public sealed class Phase3DistributionTests
     }
 
     [Fact]
+    public async Task SingleInstanceIgnoresUnknownCommandAndDisposalReleasesOwnership()
+    {
+        var name = Guid.NewGuid().ToString("N");
+        using var first = new SingleInstanceCoordinator(name);
+        using var second = new SingleInstanceCoordinator(name);
+        var activated = false;
+        first.ActivationRequested += (_, _) => activated = true;
+        first.StartActivationServer();
+
+        await second.SignalAsync("unknown-command");
+        await Task.Delay(150);
+
+        Assert.False(activated);
+        first.Dispose();
+        second.Dispose();
+        using var replacement = new SingleInstanceCoordinator(name);
+        Assert.True(replacement.IsPrimary);
+    }
+
+    [Fact]
+    public void StartupRegistrationFailureLeavesNoPerUserValueWritten()
+    {
+        var store = new FailingStartupStore();
+        var service = new StartupRegistrationService(store);
+
+        Assert.Throws<UnauthorizedAccessException>(() => service.SetEnabled(true, @"C:\Program Files\KeySounds\KeySounds.exe"));
+        Assert.Null(store.GetValue("KeySounds"));
+    }
+
+    [Fact]
+    public async Task DiagnosticReportIncludesRequiredAggregateSectionsWithoutKeyboardData()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KeySounds.Phase3Diagnostics", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var paths = new StoragePaths(root);
+            Directory.CreateDirectory(paths.Root);
+            Directory.CreateDirectory(paths.ProfilesDirectory);
+            Directory.CreateDirectory(paths.SoundPacksDirectory);
+            await File.WriteAllTextAsync(paths.SettingsFile, """
+            {
+              "schemaVersion": 4,
+              "soundsEnabled": true,
+              "activeProfileId": "profile-secret",
+              "audioOutputSelection": { "kind": "SystemDefault" },
+              "audioLatencyMilliseconds": 20,
+              "startWithWindows": false,
+              "minimizeToTray": true,
+              "closeToTray": true,
+              "showWindowOnStartup": true,
+              "keyboardProfileAssignments": {
+                "kbd-v1-secret": "profile-secret"
+              }
+            }
+            """);
+            await File.WriteAllTextAsync(Path.Combine(paths.ProfilesDirectory, "profile-secret.json"), "{}");
+            Directory.CreateDirectory(Path.Combine(paths.SoundPacksDirectory, "invalid-pack"));
+
+            var service = new DiagnosticReportService(paths);
+            var output = Path.Combine(root, "diagnostics.json");
+            await service.ExportAsync(output);
+            var json = await File.ReadAllTextAsync(output);
+            using var document = JsonDocument.Parse(json);
+
+            Assert.Equal(1, document.RootElement.GetProperty("ReportVersion").GetInt32());
+            Assert.Equal(4, document.RootElement.GetProperty("SettingsSchemaVersion").GetInt32());
+            Assert.Equal(1, document.RootElement.GetProperty("KeyboardAssignmentCount").GetInt32());
+            Assert.Equal(1, document.RootElement.GetProperty("ProfileFileCount").GetInt32());
+            Assert.Equal(1, document.RootElement.GetProperty("InvalidSoundPackDirectoryCount").GetInt32());
+            Assert.DoesNotContain("kbd-v1-secret", json);
+            Assert.DoesNotContain("profile-secret", json);
+            Assert.DoesNotContain("scanCode", json, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("virtualKey", json, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
     public async Task LocalErrorReportHonorsSettingAndSanitizesUserName()
     {
         var root = Path.Combine(Path.GetTempPath(), "KeySounds.Phase3Reports", Guid.NewGuid().ToString("N"));
@@ -95,11 +177,41 @@ public sealed class Phase3DistributionTests
         }
     }
 
+    [Fact]
+    public void LocalErrorReportCleanupRemovesExpiredReports()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KeySounds.Phase3Reports", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var paths = new StoragePaths(root);
+            var service = new LocalErrorReportService(paths);
+            Directory.CreateDirectory(service.ReportsDirectory);
+            var oldPath = Path.Combine(service.ReportsDirectory, "error-old.json");
+            File.WriteAllText(oldPath, "{}");
+            File.SetCreationTimeUtc(oldPath, DateTime.UtcNow.AddDays(-30));
+
+            service.Cleanup(14);
+
+            Assert.False(File.Exists(oldPath));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
     private sealed class FakeStartupStore : IStartupRegistrationStore
     {
         public Dictionary<string, string> Values { get; } = [];
         public void SetValue(string name, string value) => Values[name] = value;
         public void DeleteValue(string name) => Values.Remove(name);
         public string? GetValue(string name) => Values.TryGetValue(name, out var value) ? value : null;
+    }
+
+    private sealed class FailingStartupStore : IStartupRegistrationStore
+    {
+        public void SetValue(string name, string value) => throw new UnauthorizedAccessException("Registry denied.");
+        public void DeleteValue(string name) { }
+        public string? GetValue(string name) => null;
     }
 }

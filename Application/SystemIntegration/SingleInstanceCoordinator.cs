@@ -11,6 +11,7 @@ public sealed class SingleInstanceCoordinator : IDisposable
     private readonly CancellationTokenSource _lifetime = new();
     private Task? _serverTask;
     private bool _ownsMutex;
+    private bool _disposed;
 
     public SingleInstanceCoordinator(string? discriminator = null)
     {
@@ -31,10 +32,13 @@ public sealed class SingleInstanceCoordinator : IDisposable
     }
 
     public async Task SignalActivationAsync(CancellationToken token = default)
+        => await SignalAsync("activate", token);
+
+    public async Task SignalAsync(string command, CancellationToken token = default)
     {
         await using var pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.Out, PipeOptions.Asynchronous);
         await pipe.ConnectAsync(500, token);
-        var bytes = Encoding.UTF8.GetBytes("activate");
+        var bytes = Encoding.UTF8.GetBytes(command);
         await pipe.WriteAsync(bytes, token);
         await pipe.FlushAsync(token);
     }
@@ -59,6 +63,8 @@ public sealed class SingleInstanceCoordinator : IDisposable
 
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
         _lifetime.Cancel();
         try { _serverTask?.Wait(TimeSpan.FromMilliseconds(500)); } catch { }
         if (_ownsMutex) { try { _mutex.ReleaseMutex(); } catch { } _ownsMutex = false; }

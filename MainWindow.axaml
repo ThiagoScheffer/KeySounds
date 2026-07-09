@@ -3,7 +3,7 @@
         xmlns:vm="using:KeySounds.ViewModels"
         x:DataType="vm:MainWindowViewModel"
         x:Class="KeySounds.MainWindow" Width="1100" Height="760" MinWidth="900" MinHeight="650" Title="KeySounds">
-  <TabControl Margin="20">
+  <TabControl Margin="20" SelectedIndex="{Binding SelectedTabIndex}">
     <TabItem Header="Dashboard">
       <ScrollViewer><StackPanel Margin="18" Spacing="18" MaxWidth="760" HorizontalAlignment="Left">
         <TextBlock FontSize="30" FontWeight="SemiBold" Text="KeySounds"/>

@@ -38,6 +38,32 @@ Open Profiles and check the validation summary. Missing packs or sound sets must
 
 Open Settings and enable “Show window on startup,” or use the tray menu → Open KeySounds.
 
+## Tray icon is not visible
+
+- Check the Windows hidden-icons overflow area.
+- Confirm the app process is still running.
+- Launch KeySounds again; the second launch should activate the existing instance.
+- If the icon still does not appear, exit the process from Task Manager and start KeySounds again.
+
+## App keeps running after close
+
+This is expected when Settings → Close to tray is enabled. Use the tray menu → Exit for a full shutdown, or disable Close to tray in Settings if the window close button should exit the app.
+
+## Minimize hides the window
+
+This is expected when Settings → Minimize to tray is enabled. Disable Minimize to tray in Settings to keep normal minimize behavior.
+
+## Start with Windows does not work
+
+- Toggle Settings → Start with Windows off and on again.
+- Confirm the per-user registry value exists at `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+- Confirm the command points to the current `KeySounds.exe` and includes `--startup`.
+- No admin rights should be required.
+
+## Second launch only focuses the existing app
+
+KeySounds is intentionally single-instance. A second launch sends an activation request to the first process and then exits, so there should not be a second Raw Input listener or audio engine.
+
 ## Reset app data
 
 Close KeySounds fully from the tray Exit command, then move or delete `%LocalAppData%\KeySounds`.

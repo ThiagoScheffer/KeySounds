@@ -178,7 +178,11 @@ public partial class App : Avalonia.Application
         var active = new NativeMenuItem();
         active.IsEnabled = false;
         var soundPacks = new NativeMenuItem("Open Sound Packs");
-        soundPacks.Click += (_, _) => OpenMainWindow(window);
+        soundPacks.Click += (_, _) =>
+        {
+            viewModel.SelectedTabIndex = 2;
+            OpenMainWindow(window);
+        };
         var diagnostics = new NativeMenuItem("Export Diagnostics");
         diagnostics.Click += (_, _) => viewModel.SettingsPage?.ExportDiagnosticsCommand.Execute(null);
         var exit = new NativeMenuItem("Exit");
