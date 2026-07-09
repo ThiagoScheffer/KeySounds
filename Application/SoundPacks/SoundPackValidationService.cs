@@ -20,7 +20,7 @@ public sealed class SoundPackValidationService(SoundPackValidationOptions? optio
 
     public async Task<SoundPackValidationResult> ValidateAsync(string root, CancellationToken token = default)
     {
-        var issues = new List<ValidationIssue>(); long decodedBytes = 0; var sampleCount = 0;
+        var issues = new List<ValidationIssue>(); var samples = new List<SoundSampleValidationMetadata>(); long decodedBytes = 0; var sampleCount = 0;
         var manifestPath = Path.Combine(root, "manifest.json");
         if (!Directory.Exists(root)) return Invalid("SourceMissing", "Sound-pack directory does not exist.");
         if (!File.Exists(manifestPath)) return Invalid("ManifestMissing", "manifest.json is missing.");
@@ -56,14 +56,16 @@ public sealed class SoundPackValidationService(SoundPackValidationOptions? optio
                     using var reader = new WaveFileReader(fullPath);
                     if (reader.WaveFormat.Channels is < 1 or > 2 || reader.WaveFormat.SampleRate is < 8000 or > 192000) { issues.Add(new("UnsupportedWaveFormat", $"WAV '{relative}' has unsupported channels or sample rate.")); continue; }
                     if (reader.TotalTime < _options.MinDuration || reader.TotalTime > _options.MaxDuration) { issues.Add(new("InvalidDuration", $"WAV '{relative}' duration is outside the supported range.")); continue; }
-                    decodedBytes = checked(decodedBytes + checked((long)Math.Ceiling(reader.TotalTime.TotalSeconds * 48000) * 2 * sizeof(float)));
+                    var sampleDecodedBytes = checked((long)Math.Ceiling(reader.TotalTime.TotalSeconds * 48000) * 2 * sizeof(float));
+                    decodedBytes = checked(decodedBytes + sampleDecodedBytes);
+                    samples.Add(new(set.Id, relative!.Replace('\\', '/'), reader.TotalTime, sampleDecodedBytes));
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException) { issues.Add(new("InvalidWave", $"WAV '{relative}' could not be decoded.")); }
             }
         }
         if (sampleCount > _options.MaximumSamplesPerPack) issues.Add(new("TooManySamples", "Pack exceeds the total sample limit."));
         if (decodedBytes > _options.MaximumDecodedBytes) issues.Add(new("DecodedMemoryLimit", "Pack exceeds the decoded-memory limit."));
-        return new(!issues.Any(issue => issue.Severity == ValidationSeverity.Error), issues.AsReadOnly(), decodedBytes, sampleCount, manifest);
+        return new(!issues.Any(issue => issue.Severity == ValidationSeverity.Error), issues.AsReadOnly(), decodedBytes, sampleCount, manifest, samples.AsReadOnly());
 
         SoundPackValidationResult Invalid(string code, string message) => new(false, [new(code, message)], 0, 0);
     }

@@ -46,6 +46,8 @@ public sealed class ProfileManagementService(JsonProfileRepository repository, P
         {
             if (profile.Id == "default") return new(false, "FallbackProtected", "The fallback profile cannot be deleted.");
             if (settings.Settings.ActiveProfileId == profile.Id) return new(false, "ActiveProfile", "Activate another profile before deleting this one.");
+            var keyboardReferences = settings.Settings.KeyboardProfileAssignments.Where(item => item.Value == profile.Id).Select(item => item.Key).ToArray();
+            if (keyboardReferences.Length > 0) return new(false, "KeyboardAssignments", $"Clear {keyboardReferences.Length} keyboard assignment(s) before deleting this profile.");
             await repository.DeleteAsync(profile.Id, token); await settings.ReloadProfilesAsync(token); return new(true);
         }, token);
 

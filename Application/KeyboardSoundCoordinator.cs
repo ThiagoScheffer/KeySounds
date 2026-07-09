@@ -12,6 +12,7 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
     private readonly Channel<KeyboardInputEvent> _events = Channel.CreateBounded<KeyboardInputEvent>(new BoundedChannelOptions(256)
     { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true, SingleWriter = false });
     private readonly KeyboardSoundRouter _router;
+    private readonly IKeyboardDeviceIdentityService? _identity;
     private readonly object _lifecycleGate = new();
     private CancellationTokenSource? _cts;
     private Task? _consumer;
@@ -20,10 +21,11 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
     private bool _terminal;
     private TaskCompletionSource<KeyIdentifier>? _capture;
 
-    public KeyboardSoundCoordinator(IKeyboardInputSource input, IAudioEngine audio, KeyboardSoundRouter? router = null)
+    public KeyboardSoundCoordinator(IKeyboardInputSource input, IAudioEngine audio, KeyboardSoundRouter? router = null, IKeyboardDeviceIdentityService? identity = null)
     {
         _input = input; _audio = audio;
         _router = router ?? Phase2Defaults.CreateRouter();
+        _identity = identity;
     }
     public bool IsEnabled { get; set; } = true;
     public string InputStatus { get; private set; } = "Stopped";
@@ -53,6 +55,7 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
             InputStatus = "Starting"; Changed();
             _input.InputReceived += OnInput;
             _input.Failure += OnInputFailure;
+            _input.DeviceChanged += OnDeviceChanged;
             _consumer = ConsumeAsync(_cts.Token);
             await _input.StartAsync(_cts.Token);
             InputStatus = "Active";
@@ -64,6 +67,7 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
 
     private void OnInput(object? sender, KeyboardInputEvent value)
     {
+        _identity?.RequestResolution(value.DeviceHandle);
         var capture = Volatile.Read(ref _capture);
         if (capture is not null && value.Action == KeyboardAction.KeyDown && capture.TrySetResult(new(value.ScanCode, value.IsExtended)))
         {
@@ -72,6 +76,7 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
         }
         _events.Writer.TryWrite(value);
     }
+    private void OnDeviceChanged(object? sender, KeyboardDeviceChangeEventArgs value) { _identity?.NotifyDeviceChange(value.DeviceHandle, value.Arrived); if (!value.Arrived) _router.ClearDeviceState(value.DeviceHandle); }
     public async Task<KeyIdentifier> CaptureNextKeyAsync(CancellationToken token = default)
     {
         lock (_lifecycleGate) if (_terminal) throw new ObjectDisposedException(nameof(KeyboardSoundCoordinator));
@@ -112,6 +117,7 @@ public sealed class KeyboardSoundCoordinator : IAsyncDisposable
         List<Exception>? failures = null;
         _input.InputReceived -= OnInput;
         _input.Failure -= OnInputFailure;
+        _input.DeviceChanged -= OnDeviceChanged;
         _cts?.Cancel();
         CancelKeyCapture();
         try { await _input.StopAsync().ConfigureAwait(false); } catch (Exception ex) { (failures ??= []).Add(ex); }

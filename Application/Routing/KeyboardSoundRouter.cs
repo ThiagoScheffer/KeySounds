@@ -8,6 +8,7 @@ public interface ISoundSetCatalog
 {
     bool TryGetFiles(string packId, string setId, out IReadOnlyList<string> files);
 }
+public interface IDeviceProfileResolver { CompiledSoundProfile? Resolve(nint deviceHandle); }
 
 public sealed class BuiltInSoundSetCatalog : ISoundSetCatalog
 {
@@ -23,10 +24,12 @@ public sealed class KeyboardSoundRouter(ActiveProfileService profiles, KeyGroupR
 {
     private readonly Dictionary<(nint Device, KeyIdentifier Key), long> _pressed = [];
     public float GlobalVolume { get; set; } = 1f;
+    private IDeviceProfileResolver? _deviceProfiles;
+    public void SetDeviceProfileResolver(IDeviceProfileResolver resolver) => Volatile.Write(ref _deviceProfiles, resolver);
 
     public SoundTrigger? Route(KeyboardInputEvent input)
     {
-        var profile = profiles.Current;
+        var profile = Volatile.Read(ref _deviceProfiles)?.Resolve(input.DeviceHandle) ?? profiles.Current;
         var key = new KeyIdentifier(input.ScanCode, input.IsExtended);
         var stateKey = (input.DeviceHandle, key);
         var isDown = input.Action == KeyboardAction.KeyDown;
@@ -64,4 +67,8 @@ public sealed class KeyboardSoundRouter(ActiveProfileService profiles, KeyGroupR
     }
 
     public void ClearState() => _pressed.Clear();
+    public void ClearDeviceState(nint deviceHandle)
+    {
+        foreach (var key in _pressed.Keys.Where(key => key.Device == deviceHandle).ToArray()) _pressed.Remove(key);
+    }
 }

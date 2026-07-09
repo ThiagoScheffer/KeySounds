@@ -4,7 +4,7 @@ namespace KeySounds.Core.Settings;
 
 public sealed class ApplicationSettings
 {
-    public int SchemaVersion { get; set; } = 2;
+    public int SchemaVersion { get; set; } = 3;
     public bool SoundsEnabled { get; set; } = true;
     public string? ActiveProfileId { get; set; }
     public string? AudioOutputDeviceId { get; set; }
@@ -13,4 +13,5 @@ public sealed class ApplicationSettings
     public float GlobalVolume { get; set; } = 1f;
     public bool MinimizeOnClose { get; set; }
     public Dictionary<string, string> KeyboardDeviceProfileAssignments { get; set; } = [];
+    public Dictionary<string, string> KeyboardProfileAssignments { get; set; } = new(StringComparer.Ordinal);
 }

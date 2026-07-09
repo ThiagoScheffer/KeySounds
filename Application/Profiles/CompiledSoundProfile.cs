@@ -40,3 +40,18 @@ public sealed class ActiveProfileService(CompiledSoundProfile initial)
     public CompiledSoundProfile Current => Volatile.Read(ref _current);
     public void Activate(CompiledSoundProfile profile) => Volatile.Write(ref _current, profile);
 }
+
+public static class ProfileRequirements
+{
+    public static IReadOnlyCollection<Core.SoundPacks.SoundSetReference> GetRequiredSets(CompiledSoundProfile profile)
+    {
+        var required = profile.Groups.Values.Where(item => item.Enabled).SelectMany(item => new[] { item.DownSetId, item.UpSetId }.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => new Core.SoundPacks.SoundSetReference(item.PackId, id!))).ToList();
+        var resolver = new Routing.KeyGroupResolver();
+        foreach (var pair in profile.Overrides.Where(item => item.Value.Enabled))
+        {
+            profile.Groups.TryGetValue(resolver.Resolve(pair.Key), out var group); var pack = pair.Value.PackId ?? group?.PackId; if (pack is null) continue;
+            foreach (var set in new[] { pair.Value.DownSetId, pair.Value.UpSetId }.Where(id => !string.IsNullOrWhiteSpace(id))) required.Add(new(pack, set!));
+        }
+        return required.Distinct().ToArray();
+    }
+}

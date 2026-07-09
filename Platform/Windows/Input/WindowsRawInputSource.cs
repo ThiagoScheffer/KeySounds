@@ -24,6 +24,7 @@ public sealed class WindowsRawInputSource : IKeyboardInputSource
 
     public event EventHandler<KeyboardInputEvent>? InputReceived;
     public event EventHandler<InputFailureEventArgs>? Failure;
+    public event EventHandler<KeyboardDeviceChangeEventArgs>? DeviceChanged;
 
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
@@ -110,7 +111,7 @@ public sealed class WindowsRawInputSource : IKeyboardInputSource
             _windowReady!.TrySetResult(_window);
 
             if (_lifetime!.IsCancellationRequested) return;
-            var devices = new[] { new NativeMethods.RawInputDevice { usagePage = 0x01, usage = 0x06, flags = NativeMethods.RidevInputSink, target = _window } };
+            var devices = new[] { new NativeMethods.RawInputDevice { usagePage = 0x01, usage = 0x06, flags = NativeMethods.RidevInputSink | NativeMethods.RidevDeviceNotify, target = _window } };
             if (!NativeMethods.RegisterRawInputDevices(devices, 1, (uint)Marshal.SizeOf<NativeMethods.RawInputDevice>())) Throw("RegisterRawInputDevices");
             rawInputRegistered = true;
             if (_lifetime.IsCancellationRequested) return;
@@ -161,6 +162,7 @@ public sealed class WindowsRawInputSource : IKeyboardInputSource
             try
             {
                 if (message == NativeMethods.WmInput) ReadInput(lParam, ref buffer, ref bufferCapacity);
+                else if (message == NativeMethods.WmInputDeviceChange) DeviceChanged?.Invoke(this, new KeyboardDeviceChangeEventArgs(lParam, wParam == 1));
                 else if (message == NativeMethods.WmClose)
                 {
                     if (!NativeMethods.DestroyWindow(hwnd)) Throw("DestroyWindow");

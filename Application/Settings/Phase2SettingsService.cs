@@ -20,7 +20,9 @@ public sealed class Phase2SettingsService(JsonApplicationSettingsRepository sett
     public string? StatusMessage { get; private set; }
     public int ValidPackCount => catalog?.Packs.Count(pack => pack.Validation.IsValid) ?? 1;
     public int InvalidPackCount => catalog?.Packs.Count(pack => !pack.Validation.IsValid) ?? 0;
+    public IReadOnlyList<string> ValidPackIds => catalog?.Packs.Where(pack => pack.Validation.IsValid && pack.Manifest is not null).Select(pack => pack.Manifest!.Id).ToArray() ?? ["builtin"];
     public SampleCacheSnapshot CacheSnapshot => sampleCache?.GetSnapshot() ?? new(1, 0, 1, false, 0);
+    public event EventHandler? Changed;
 
     public async Task InitializeAsync(CancellationToken token = default)
     {
@@ -35,26 +37,27 @@ public sealed class Phase2SettingsService(JsonApplicationSettingsRepository sett
         var selected = profiles.FirstOrDefault(profile => profile.Id == Settings.ActiveProfileId) ?? profiles[0];
         if (sampleCache is not null)
         {
-            var preparation = await sampleCache.PrepareAsync(GetRequiredSets(ProfileCompiler.Compile(selected)), token);
+            var preparation = await sampleCache.PrepareAsync(ProfileRequirements.GetRequiredSets(ProfileCompiler.Compile(selected)), token);
             if (!preparation.Success && selected.Id != "default")
             {
                 selected = profiles.First(profile => profile.Id == "default");
-                preparation = await sampleCache.PrepareAsync(GetRequiredSets(ProfileCompiler.Compile(selected)), token);
+                preparation = await sampleCache.PrepareAsync(ProfileRequirements.GetRequiredSets(ProfileCompiler.Compile(selected)), token);
             }
             if (!preparation.Success) throw new InvalidOperationException(preparation.Message ?? "Required profile samples could not be prepared.");
         }
         Settings.ActiveProfileId = selected.Id;
         activeProfiles.Activate(ProfileCompiler.Compile(selected));
         router.GlobalVolume = Math.Clamp(Settings.GlobalVolume, 0, 1);
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    public async Task SetEnabledAsync(bool enabled, CancellationToken token = default) { Settings.SoundsEnabled = enabled; await settingsRepository.SaveAsync(Settings, token); }
-    public async Task SetGlobalVolumeAsync(float volume, CancellationToken token = default) { Settings.GlobalVolume = Math.Clamp(volume, 0, 1); router.GlobalVolume = Settings.GlobalVolume; await settingsRepository.SaveAsync(Settings, token); }
+    public async Task SetEnabledAsync(bool enabled, CancellationToken token = default) { Settings.SoundsEnabled = enabled; await settingsRepository.SaveAsync(Settings, token); Changed?.Invoke(this, EventArgs.Empty); }
+    public async Task SetGlobalVolumeAsync(float volume, CancellationToken token = default) { Settings.GlobalVolume = Math.Clamp(volume, 0, 1); router.GlobalVolume = Settings.GlobalVolume; await settingsRepository.SaveAsync(Settings, token); Changed?.Invoke(this, EventArgs.Empty); }
     public async Task SaveAudioConfigurationAsync(AudioOutputSelection selection, int latency, CancellationToken token = default)
     {
         var oldSelection = Settings.AudioOutputSelection; var oldLatency = Settings.AudioLatencyMilliseconds; var oldLegacyId = Settings.AudioOutputDeviceId;
         Settings.AudioOutputSelection = selection; Settings.AudioLatencyMilliseconds = latency; Settings.AudioOutputDeviceId = selection.Kind == AudioOutputSelectionKind.SpecificDevice ? selection.DeviceId : null;
-        try { await settingsRepository.SaveAsync(Settings, token); }
+        try { await settingsRepository.SaveAsync(Settings, token); Changed?.Invoke(this, EventArgs.Empty); }
         catch { Settings.AudioOutputSelection = oldSelection; Settings.AudioLatencyMilliseconds = oldLatency; Settings.AudioOutputDeviceId = oldLegacyId; throw; }
     }
     public async Task ActivateAsync(string profileId, CancellationToken token = default)
@@ -65,7 +68,7 @@ public sealed class Phase2SettingsService(JsonApplicationSettingsRepository sett
             if (_shutdown) throw new ObjectDisposedException(nameof(Phase2SettingsService));
             var profile = Profiles.FirstOrDefault(item => item.Id == profileId) ?? throw new ArgumentException("Unknown profile.", nameof(profileId));
             var compiled = ProfileCompiler.Compile(profile);
-            var required = GetRequiredSets(compiled);
+            var required = ProfileRequirements.GetRequiredSets(compiled);
             if (sampleCache is not null)
             {
                 var preparation = await sampleCache.PrepareAsync(required, token);
@@ -78,11 +81,17 @@ public sealed class Phase2SettingsService(JsonApplicationSettingsRepository sett
             try { await settingsRepository.SaveAsync(Settings, token); }
             catch { activeProfiles.Activate(previousProfile); Settings.ActiveProfileId = previousId; throw; }
             if (sampleCache is not null) await sampleCache.ReleaseUnusedAsync(required, token);
+            Changed?.Invoke(this, EventArgs.Empty);
         }
         finally { _activationGate.Release(); }
     }
 
-    public Task RefreshPacksAsync(CancellationToken token = default) => catalog?.RefreshAsync(token) ?? Task.CompletedTask;
+    public async Task RefreshPacksAsync(CancellationToken token = default) { if (catalog is not null) await catalog.RefreshAsync(token); Changed?.Invoke(this, EventArgs.Empty); }
+    public async Task SaveKeyboardAssignmentsAsync(Dictionary<string, string> assignments, CancellationToken token = default)
+    {
+        var previous = Settings.KeyboardProfileAssignments; Settings.KeyboardProfileAssignments = new(assignments, StringComparer.Ordinal);
+        try { await settingsRepository.SaveAsync(Settings, token); Changed?.Invoke(this, EventArgs.Empty); } catch { Settings.KeyboardProfileAssignments = previous; throw; }
+    }
     public async Task ReloadProfilesAsync(CancellationToken token = default)
     {
         var profiles = (await profileRepository.ListAsync(token)).ToList();
@@ -94,20 +103,7 @@ public sealed class Phase2SettingsService(JsonApplicationSettingsRepository sett
         }
         Profiles = profiles.OrderBy(profile => profile.Id == "default" ? 0 : 1).ThenBy(profile => profile.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
         if (profileRepository.LastLoadIssues.Count > 0) StatusMessage = string.Join(Environment.NewLine, profileRepository.LastLoadIssues);
-    }
-    private static IReadOnlyCollection<SoundSetReference> GetRequiredSets(CompiledSoundProfile profile)
-    {
-        var required = profile.Groups.Values.Where(item => item.Enabled)
-            .SelectMany(item => new[] { item.DownSetId, item.UpSetId }.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => new SoundSetReference(item.PackId, id!))).ToList();
-        var resolver = new KeyGroupResolver();
-        foreach (var pair in profile.Overrides.Where(item => item.Value.Enabled))
-        {
-            profile.Groups.TryGetValue(resolver.Resolve(pair.Key), out var group);
-            var pack = pair.Value.PackId ?? group?.PackId;
-            if (pack is null) continue;
-            foreach (var set in new[] { pair.Value.DownSetId, pair.Value.UpSetId }.Where(id => !string.IsNullOrWhiteSpace(id))) required.Add(new(pack, set!));
-        }
-        return required.Distinct().ToArray();
+        Changed?.Invoke(this, EventArgs.Empty);
     }
     public async ValueTask DisposeAsync() { _shutdown = true; await _activationGate.WaitAsync(); _activationGate.Release(); _activationGate.Dispose(); }
 }

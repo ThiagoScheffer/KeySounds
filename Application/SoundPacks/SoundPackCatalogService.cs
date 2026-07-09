@@ -34,9 +34,12 @@ public sealed class SoundPackCatalogService(StoragePaths paths, SoundPackValidat
         var root = Path.Combine(paths.SoundPacksDirectory, "builtin");
         var sample = Path.Combine(root, "samples", "key-click.wav");
         Directory.CreateDirectory(Path.GetDirectoryName(sample)!);
-        await using (var source = AssetLoader.Open(new Uri("avares://KeySounds/Assets/Audio/key-click.wav")))
-        await using (var destination = new FileStream(sample, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
-        { await source.CopyToAsync(destination, token); await destination.FlushAsync(token); destination.Flush(true); }
+        if (!File.Exists(sample))
+        {
+            await using (var source = AssetLoader.Open(new Uri("avares://KeySounds/Assets/Audio/key-click.wav")))
+            await using (var destination = new FileStream(sample, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
+            { await source.CopyToAsync(destination, token); await destination.FlushAsync(token); destination.Flush(true); }
+        }
         var manifestPath = Path.Combine(root, "manifest.json");
         if (!File.Exists(manifestPath))
         {
