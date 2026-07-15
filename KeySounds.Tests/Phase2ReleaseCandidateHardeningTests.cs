@@ -66,5 +66,7 @@ public sealed class Phase2ReleaseCandidateHardeningTests
             await Task.Delay(TimeSpan.FromMinutes(5), token);
             return null;
         }
+
+        public Task<IReadOnlyList<string>> PickSampleFilesAsync(CancellationToken token = default) => Task.FromResult<IReadOnlyList<string>>([]);
     }
 }

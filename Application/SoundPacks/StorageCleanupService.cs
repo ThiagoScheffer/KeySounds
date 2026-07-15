@@ -49,7 +49,8 @@ public sealed class StorageCleanupService(StoragePaths paths)
            || name.StartsWith(".replace-", StringComparison.OrdinalIgnoreCase)
            || name.StartsWith(".trash-", StringComparison.OrdinalIgnoreCase)
            || name.StartsWith(".cache-", StringComparison.OrdinalIgnoreCase)
-           || name.StartsWith(".atomic-", StringComparison.OrdinalIgnoreCase);
+           || name.StartsWith(".atomic-", StringComparison.OrdinalIgnoreCase)
+           || name.StartsWith(".draft-", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsUnderRoot(string root, string candidate)
     {

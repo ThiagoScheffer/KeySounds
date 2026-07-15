@@ -22,6 +22,17 @@ public sealed class ProfileManagementService(JsonProfileRepository repository, P
             await repository.SaveAsync(profile, token); await settings.ReloadProfilesAsync(token); return new(true, Profile: profile);
         }, token);
 
+    public async Task<ProfileOperationResult> SaveGeneratedAsync(SoundProfile profile, bool activate, CancellationToken token = default)
+        => await MutateAsync(async () =>
+        {
+            var issues = validator.Validate(profile);
+            if (issues.Any(issue => issue.Severity == ProfileValidationSeverity.Error)) return Invalid(issues);
+            await repository.SaveAsync(profile, token);
+            await settings.ReloadProfilesAsync(token);
+            if (activate) await settings.ActivateAsync(profile.Id, token);
+            return new(true, Profile: profile);
+        }, token);
+
     public Task<ProfileOperationResult> DuplicateAsync(SoundProfile source, CancellationToken token = default) => CreateAsync(source.Name + " Copy", source, token);
 
     public async Task<ProfileOperationResult> RenameAsync(SoundProfile source, string name, CancellationToken token = default)

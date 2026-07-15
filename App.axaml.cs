@@ -87,7 +87,8 @@ public partial class App : Avalonia.Application
             var soundPackPicker = new AvaloniaSoundPackFolderPicker(() => desktop.MainWindow);
             var soundPackConflicts = new AvaloniaSoundPackConflictResolver(() => desktop.MainWindow);
             var soundPackDependencies = new SoundPackDependencyService(settings);
-            _soundPacksPage = new SoundPacksViewModel(_catalog, soundPackValidator, _soundPackImport, settings, _preview, _sampleCache, soundPackPicker, soundPackConflicts, soundPackDependencies, new StorageCleanupService(paths));
+            var soundPackDrafts = new SoundPackDraftService(paths, soundPackValidator, _catalog, _soundPackImport, () => settings.Profiles);
+            _soundPacksPage = new SoundPacksViewModel(_catalog, soundPackValidator, _soundPackImport, settings, _preview, _sampleCache, soundPackPicker, soundPackConflicts, soundPackDependencies, new StorageCleanupService(paths), soundPackDrafts, _profileManagement);
             _profilesPage = new ProfilesPageViewModel(_profileManagement, settings, profileValidator, _catalog, _preview, _coordinator, picker);
             _keyboardsPage = new KeyboardsViewModel(_keyboardIdentity, _keyboardAssignments, settings, _preview);
             _settingsPage = new SettingsViewModel(settings, new StartupRegistrationService(new RegistryStartupRegistrationStore()), new DiagnosticReportService(paths), paths);

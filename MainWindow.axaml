@@ -73,7 +73,7 @@
       </Grid>
     </TabItem>
     <TabItem Header="Sound Packs" DataContext="{Binding SoundPacksPage}">
-      <Grid x:DataType="vm:SoundPacksViewModel" Margin="12" ColumnDefinitions="330,12,*" RowDefinitions="Auto,*" RowSpacing="10">
+      <Grid x:DataType="vm:SoundPacksViewModel" Margin="12" ColumnDefinitions="330,12,*" RowDefinitions="Auto,Auto,*" RowSpacing="10">
         <Grid Grid.ColumnSpan="3" ColumnDefinitions="*,Auto" ColumnSpacing="12">
           <StackPanel>
             <TextBlock FontSize="28" FontWeight="SemiBold" Text="Sound Packs"/>
@@ -86,7 +86,56 @@
             <Button Margin="0,0,8,8" Content="Cleanup storage" Command="{Binding CleanupCommand}"/>
           </WrapPanel>
         </Grid>
-        <Grid Grid.Row="1" ColumnDefinitions="330,12,*">
+        <Border Grid.Row="1" Grid.ColumnSpan="3" Background="#14007ACC" BorderBrush="#28007ACC" BorderThickness="1" CornerRadius="8" Padding="12" DataContext="{Binding Creator}">
+          <StackPanel x:DataType="vm:SoundPackCreatorViewModel" Spacing="10">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel>
+                <TextBlock FontSize="20" FontWeight="SemiBold" Text="{Binding Title}"/>
+                <TextBlock TextWrapping="Wrap" Text="Create or edit a pack by adding WAV files to sound-set buckets. Drafts validate before they can replace an installed pack."/>
+              </StackPanel>
+              <WrapPanel Grid.Column="1">
+                <Button Margin="0,0,8,8" Content="Create Pack" Command="{Binding CreateCommand}"/>
+                <Button Margin="0,0,8,8" Content="Edit Selected" Command="{Binding EditCommand}"/>
+                <Button Margin="0,0,8,8" Content="Save Pack" Command="{Binding SaveCommand}"/>
+                <Button Margin="0,0,8,8" Content="Save Pack + Create Profile" Command="{Binding SaveAndCreateProfileCommand}"/>
+                <Button Margin="0,0,8,8" Content="Cancel" Command="{Binding CancelCommand}"/>
+              </WrapPanel>
+            </Grid>
+            <Grid ColumnDefinitions="120,180,80,200,80,160,100,*" ColumnSpacing="8" IsVisible="{Binding IsEditing}">
+              <TextBlock VerticalAlignment="Center" Text="Pack ID"/><TextBox Grid.Column="1" Text="{Binding PackId}"/>
+              <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="Name"/><TextBox Grid.Column="3" Text="{Binding Name}"/>
+              <TextBlock Grid.Column="4" VerticalAlignment="Center" Text="Author"/><TextBox Grid.Column="5" Text="{Binding Author}"/>
+              <CheckBox Grid.Column="6" VerticalAlignment="Center" Content="Activate profile" IsChecked="{Binding ActivateGeneratedProfile}"/>
+              <TextBox Grid.Column="7" PlaceholderText="Description" Text="{Binding Description}"/>
+            </Grid>
+            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsEditing}">
+              <TextBlock TextWrapping="Wrap" Foreground="DarkGoldenrod" Text="{Binding Status}"/>
+              <Button Grid.Column="1" Content="Add sound set" Command="{Binding AddSetCommand}"/>
+            </Grid>
+            <ItemsControl ItemsSource="{Binding Sets}" IsVisible="{Binding IsEditing}">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:SoundPackDraftSetViewModel">
+                  <Border Width="300" MinHeight="160" Margin="0,0,10,10" Padding="10" BorderBrush="#30000000" BorderThickness="1" CornerRadius="6" Background="#0CFFFFFF"
+                          DragDrop.AllowDrop="True" DragDrop.Drop="SoundPackDraftSetDrop">
+                    <StackPanel Spacing="7">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Text="{Binding Id}"/>
+                        <Button Grid.Column="1" Margin="6,0,0,0" Content="Remove" Command="{Binding RemoveSetCommand}"/>
+                      </Grid>
+                      <TextBox PlaceholderText="Display name" Text="{Binding Name}"/>
+                      <TextBlock FontWeight="SemiBold" Text="{Binding SampleCount, StringFormat='Samples: {0}'}"/>
+                      <TextBlock TextWrapping="Wrap" Text="{Binding FilesSummary}"/>
+                      <TextBlock FontSize="12" Opacity="0.75" Text="Drop WAV files onto this card, or use Add WAV files."/>
+                      <Button Content="Add WAV files…" Command="{Binding AddFilesCommand}"/>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+        <Grid Grid.Row="2" ColumnDefinitions="330,12,*">
           <Grid RowDefinitions="*,Auto" RowSpacing="10">
             <ListBox ItemsSource="{Binding Packs}" SelectedItem="{Binding Selected}">
               <ListBox.ItemTemplate>

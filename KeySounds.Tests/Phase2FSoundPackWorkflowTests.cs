@@ -149,6 +149,7 @@ public sealed class Phase2FSoundPackWorkflowTests
     private sealed class FakeFolderPicker(string? path) : ISoundPackFolderPicker
     {
         public Task<string?> PickImportFolderAsync(CancellationToken token = default) => Task.FromResult(path);
+        public Task<IReadOnlyList<string>> PickSampleFilesAsync(CancellationToken token = default) => Task.FromResult<IReadOnlyList<string>>([]);
     }
 
     private sealed class FakeConflictResolver(SoundPackConflictPolicy policy) : ISoundPackConflictResolver
@@ -175,9 +176,9 @@ public sealed class Phase2FSoundPackWorkflowTests
     private sealed class Phase2FFixture : IAsyncDisposable
     {
         private Phase2FFixture(string root, StoragePaths paths, SoundPackValidationService validator, SoundPackCatalogService catalog, ISoundSampleCache cache,
-            SoundPackImportService importer, Phase2SettingsService settings, JsonProfileRepository repository, SoundPreviewService preview)
+            SoundPackImportService importer, Phase2SettingsService settings, JsonProfileRepository repository, ProfileManagementService profileManagement, SoundPreviewService preview)
         {
-            Root = root; Paths = paths; Validator = validator; Catalog = catalog; Cache = cache; Importer = importer; Settings = settings; Repository = repository; Preview = preview;
+            Root = root; Paths = paths; Validator = validator; Catalog = catalog; Cache = cache; Importer = importer; Settings = settings; Repository = repository; ProfileManagement = profileManagement; Preview = preview;
         }
 
         public string Root { get; }
@@ -188,6 +189,7 @@ public sealed class Phase2FSoundPackWorkflowTests
         public SoundPackImportService Importer { get; }
         public Phase2SettingsService Settings { get; }
         public JsonProfileRepository Repository { get; }
+        public ProfileManagementService ProfileManagement { get; }
         public SoundPreviewService Preview { get; }
 
         public static async Task<Phase2FFixture> CreateAsync()
@@ -207,12 +209,14 @@ public sealed class Phase2FSoundPackWorkflowTests
             var settings = new Phase2SettingsService(new(paths, writer), repository, active, router, cache, catalog);
             await settings.InitializeAsync();
             var importer = new SoundPackImportService(paths, validator, catalog, () => settings.Profiles, cache);
+            var profileManagement = new ProfileManagementService(repository, settings, new ProfileValidationService(catalog), writer);
             var preview = new SoundPreviewService(cache, new TestAudioEngine(), catalog, new());
-            return new(root, paths, validator, catalog, cache, importer, settings, repository, preview);
+            return new(root, paths, validator, catalog, cache, importer, settings, repository, profileManagement, preview);
         }
 
         public SoundPacksViewModel CreateViewModel(ISoundPackFolderPicker picker, ISoundPackConflictResolver conflicts)
-            => new(Catalog, Validator, Importer, Settings, Preview, Cache, picker, conflicts, new SoundPackDependencyService(Settings), new StorageCleanupService(Paths));
+            => new(Catalog, Validator, Importer, Settings, Preview, Cache, picker, conflicts, new SoundPackDependencyService(Settings), new StorageCleanupService(Paths),
+                new SoundPackDraftService(Paths, Validator, Catalog, Importer, () => Settings.Profiles), ProfileManagement);
 
         public string CreateSourcePack(string id, string name = "Imported")
         {
@@ -227,6 +231,7 @@ public sealed class Phase2FSoundPackWorkflowTests
         {
             await Preview.DisposeAsync();
             await Importer.DisposeAsync();
+            await ProfileManagement.DisposeAsync();
             await Settings.DisposeAsync();
             await Cache.DisposeAsync();
             await Catalog.DisposeAsync();
