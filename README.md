@@ -1,5 +1,7 @@
 # KeySounds
 
+<img src="Assets/Icons/keysounds.png" width="96" height="96" alt="KeySounds application icon: an ivory keycap and cyan sound waves" />
+
 [![Build and test](https://github.com/ThiagoScheffer/KeySounds/actions/workflows/ci.yml/badge.svg)](https://github.com/ThiagoScheffer/KeySounds/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![Platform: Windows](https://img.shields.io/badge/Platform-Windows-0078D4)

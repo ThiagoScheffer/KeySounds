@@ -1,3 +1,5 @@
+> **Historical duplicate of Phase 2D.** Despite its filename, this document specifies audio output-device selection that is already implemented. It is not a Phase 4 product plan. Read the [current project state](../.sdlc/PROJECT-STATE.md) before continuing development.
+
 You are working inside an existing Avalonia + C# Windows keyboard-sound application.
 
 Phase 1, lifecycle hardening, Phase 2 runtime foundations, Phase 2B sound-pack infrastructure, and Phase 2C profile management/editor UI are complete.

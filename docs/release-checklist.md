@@ -1,12 +1,13 @@
 # KeySounds Phase 3 release-candidate checklist
 
+Current continuation point: [project state](../.sdlc/PROJECT-STATE.md). This checklist covers Phase 3 and the subsequently implemented sound-pack creator v1. Record manual results; automated CI does not mark these checks complete.
+
 ## Build and automated tests
 
 - Build: `dotnet build KeySounds.csproj -c Release`
 - Tests: `dotnet test KeySounds.Tests\KeySounds.Tests.csproj -c Release`
 - Diagnostics export: Settings → Export diagnostics, or tray menu → Export Diagnostics.
-- Portable publish: `dotnet publish KeySounds.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\publish\win-x64-portable`
-- Helper script: `.\scripts\publish-portable.ps1`
+- Portable publish: `.\scripts\publish-portable.ps1` (includes license/privacy notices and validates the output).
 - Expected result: zero build warnings/errors, all tests passing, and a sanitized diagnostic JSON report with aggregate counts only.
 
 ## Phase 3 verification status
@@ -136,6 +137,18 @@
   - retry restores configured device after reconnect.
 - Test latency changes on available hardware.
 
+## Sound-pack creator v1 acceptance
+
+- [ ] Create a new draft, edit metadata, and add WAV files to its sound sets.
+- [ ] Preview samples and verify duplicate filenames become safe, distinct relative paths.
+- [ ] Try an unsupported file and an empty sound set; confirm validation prevents installation.
+- [ ] Save a valid pack and confirm it appears in the installed catalog after restart.
+- [ ] Save and create a profile, activate it, and confirm keyboard groups and key-up sounds use the intended sets.
+- [ ] Edit an installed user pack; confirm a valid save replaces it and an invalid save preserves the installed copy.
+- [ ] Remove a referenced sound set; confirm the reference warning/confirmation workflow is shown.
+- [ ] Confirm the built-in fallback pack cannot be edited or replaced.
+- [ ] Cancel a draft and exit during editing; confirm installed packs remain intact and abandoned draft storage can be cleaned.
+
 ## Keyboard assignment test
 
 - Confirm connected keyboards appear on the Keyboards page.
@@ -234,7 +247,7 @@ Record approximations in `docs/release-measurements.md`. Label hardware-dependen
 
 ## Known limitations / non-goals
 
-- No marketplace, online downloads, cloud sync, account system, automatic updater, installer, or code signing in Phase 2.
+- No marketplace, online downloads, cloud sync, account system, automatic updater, installer, or code signing in the current implementation.
 - No ZIP import unless added later as a separate workflow.
-- No procedural synthesis, MIDI, firmware integration, tray behavior, per-application foreground rules, telemetry, or cross-platform input backends.
+- No procedural synthesis, MIDI, firmware integration, per-application foreground rules, application runtime telemetry upload, or cross-platform input backends. Tray behavior is implemented and requires the checks above.
 - Hardware-dependent keyboard identity and audio-device behavior must be manually verified on the target Windows machine before release.

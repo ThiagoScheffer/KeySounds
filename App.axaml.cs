@@ -194,8 +194,7 @@ public partial class App : Avalonia.Application
             toggle.Header = viewModel.IsEnabled ? "Sounds Enabled (click to disable)" : "Sounds Disabled (click to enable)";
             active.Header = "Active Profile: " + (viewModel.SelectedProfile ?? "Fallback");
         };
-        var icon = new TrayIcon { ToolTipText = "KeySounds", IsVisible = true, Menu = menu };
-        try { icon.Icon = new WindowIcon(new MemoryStream(TinyIcon)); } catch { }
+        var icon = new TrayIcon { ToolTipText = "KeySounds", IsVisible = true, Menu = menu, Icon = window.Icon };
         icon.Clicked += (_, _) => OpenMainWindow(window);
         return icon;
     }
@@ -221,8 +220,4 @@ public partial class App : Avalonia.Application
         try { await _errorReports.WriteAsync(exception, _settings.Settings, category, operation); } catch { }
     }
 
-    private static readonly byte[] TinyIcon =
-    [
-        0,0,1,0,1,0,1,1,0,0,1,0,32,0,48,0,0,0,22,0,0,0,40,0,0,0,1,0,0,0,2,0,0,0,1,0,32,0,0,0,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    ];
 }

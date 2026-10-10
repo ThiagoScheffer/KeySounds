@@ -2,7 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:KeySounds.ViewModels"
         x:DataType="vm:MainWindowViewModel"
-        x:Class="KeySounds.MainWindow" Width="1100" Height="760" MinWidth="900" MinHeight="650" Title="KeySounds">
+        x:Class="KeySounds.MainWindow" Width="1100" Height="760" MinWidth="900" MinHeight="650" Title="KeySounds"
+        Icon="avares://KeySounds/Assets/Icons/keysounds.ico">
   <TabControl Margin="20" SelectedIndex="{Binding SelectedTabIndex}">
     <TabItem Header="Dashboard">
       <ScrollViewer><StackPanel Margin="18" Spacing="18" MaxWidth="760" HorizontalAlignment="Left">
