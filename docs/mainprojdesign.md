@@ -1,3 +1,5 @@
+> **Historical architecture proposal.** This document describes the initial recommended design, including a multi-project solution that was not adopted. For the architecture implemented today, read the [current system design (SDD)](../.sdlc/design/SYSTEM-DESIGN.md). Use the [documentation index](README.md) for current guidance and phase records.
+
 ## Avalonia + C# architecture
 
 Avalonia is a strong choice when you want a modern interface now and the option to support macOS or Linux later. The correct design is to keep **Avalonia restricted to presentation and application lifecycle**, while keyboard capture and low-latency audio remain independent platform services.
